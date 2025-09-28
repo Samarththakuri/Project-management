@@ -1,0 +1,30 @@
+{
+  "name": "projectmanagement",
+  "version": "1.0.0",
+  "description": "a project management application for learning",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Samarththakuri/Project-management.git"
+  },
+  "keywords": [
+    "course",
+    "learning",
+    "backend",
+    "api",
+    "creation"
+  ],
+  "author": "samarth",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Samarththakuri/Project-management/issues"
+  },
+  "homepage": "https://github.com/Samarththakuri/Project-management#readme",
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}
