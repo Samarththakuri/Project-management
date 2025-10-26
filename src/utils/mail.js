@@ -1,4 +1,4 @@
-import { text } from "express";
+import { request, response, text } from "express";
 import Mailgen from "mailgen";
 
 import nodemailer from "nodemailer";
