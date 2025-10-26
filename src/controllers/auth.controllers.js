@@ -1,9 +1,8 @@
-import { User } from "../models/user.models.js";
+import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { useId, useImperativeHandle } from "react";
-import { sendEmail } from "../utils/mail.js";
+import { emailVerificationMailgenContent, sendEmail } from "../utils/mail.js";
 const generateAcessAndRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -46,13 +45,13 @@ const registerUser = asyncHandler(async (request, response) => {
       `${request.protocol}://${request.get("host")}/api/v1/users/verify-email/${unHashedToken}`,
     ),
   });
-  await User.findById(user._id).select(
+  const createdUser = await User.findById(user._id).select(
     "-password -refreshToken -emailToken -emailVerificationToken -emailVerificationExpiry",
   );
   if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registring a");
   }
-  return res
+  return response
     .status(201)
     .json(
       new ApiResponse(
