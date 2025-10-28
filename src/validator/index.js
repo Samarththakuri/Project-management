@@ -20,4 +20,10 @@ const userRegisterValidator = () => {
     body("fullname").optional().trim(),
   ];
 };
-export { userRegisterValidator };
+const userloginValidation = () => {
+  return [
+    body("email").optional().isEmail().withMessage("Email is invalid"),
+    body("password").notEmpty().withMessage("Password is equired"),
+  ];
+};
+export { userRegisterValidator, userloginValidation };
