@@ -1,16 +1,25 @@
-import { validationResult } from "express-validator";
 import { ApiError } from "../utils/api-error.js";
 
-export const validate = (req, res, next) => {
-  const errors = validationResult(req);
-  if (errors.isEmpty()) {
-    return next();
+export const validate = (schema) => (req, res, next) => {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    const errors = result.error.errors.map((e) => ({
+      [e.path.join(".")]: e.message,
+    }));
+    throw new ApiError(422, "Received data is not valid", errors);
   }
-  const extractedErrors = [];
-  errors.array().map((err) =>
-    extractedErrors.push({
-      [err.path]: err.msg,
-    }),
-  );
-  throw new ApiError(422, "Received data is not valid", extractedErrors);
+  req.body = result.data;
+  next();
+};
+
+export const validateParams = (schema) => (req, res, next) => {
+  const result = schema.safeParse(req.params);
+  if (!result.success) {
+    const errors = result.error.errors.map((e) => ({
+      [e.path.join(".")]: e.message,
+    }));
+    throw new ApiError(422, "Invalid request parameters", errors);
+  }
+  req.params = result.data;
+  next();
 };

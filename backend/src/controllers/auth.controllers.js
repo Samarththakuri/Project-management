@@ -8,9 +8,9 @@ import {
   sendEmail,
 } from "../utils/mail.js";
 import { response } from "express";
-import { verify } from "jsonwebtoken";
+
 import crypto from "crypto";
-import { jwt } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 const generateAccessAndRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -95,8 +95,8 @@ const login = asyncHandler(async (req, res) => {
   );
   return res
     .status(200)
-    .cookie("acesstoken", accessToken, option)
-    .cookie("refresh", refreshToken, option)
+    .cookie("accesstoken", accessToken, option)
+    .cookie("refreshToken", refreshToken, option)
     .json(
       new ApiResponse(
         200,
@@ -127,17 +127,14 @@ const logoutUser = asyncHandler(async (req, res) => {
   };
   return res
     .status(200)
-    .clearCookie("acessToken", options)
+    .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "User logged out"));
 });
-const getCurrentUser = asyncHandler(async (request, response) => {
+const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, request.user),
-      "current user fetched successfully",
-    );
+    .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
 });
 const verifyEmail = asyncHandler(async (req, res) => {
   const { verificationToken } = req.params;
@@ -147,7 +144,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   const hashedToken = crypto
     .createHash("sha256")
     .update(verificationToken)
-    .digest(hex);
+    .digest("hex");
   const user = await User.findOne({
     emailVerificationToken: hashedToken,
     emailVerificationExpiry: { $gt: Date.now() }, //Then it checks if emailVerificationExpiry > current time
@@ -182,7 +179,7 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     subject: "Please verify your email",
     mailgenContent: emailVerificationMailgenContent(
       user.username,
-      `${request.protocol}://${request.get("host")}/api/v1/users/verify-email/${unHashedToken}`,
+      `${req.protocol}://${req.get("host")}/api/v1/users/verify-email/${unHashedToken}`,
     ),
   });
   const createdUser = await User.findById(user._id).select(
@@ -191,7 +188,7 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registring a");
   }
-  return response
+  return res
     .status(201)
     .json(
       new ApiResponse(
@@ -231,8 +228,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     await user.save();
     return res
       .status(200)
-      .cookie("accessToken", options)
-      .cookie("refreshToekn", newRefreshToken, options)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
       .json(
         new ApiResponse(
           200,
@@ -282,7 +279,7 @@ const resetForgotPassword = asyncHandler(async (req, res) => {
     .update(resetToken)
     .digest("hex");
   const user = await User.findOne({
-    forgotPasswordExpiry: hashedToken,
+    forgotPasswordToken: hashedToken,
     forgotPasswordExpiry: { $gt: Date.now() },
   });
   if (!user) {
