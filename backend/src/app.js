@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { ApiError } from "./utils/api-error.js";
 const app = express();
 // basic configurations middleware hai
 app.use(express.json({ limit: "16kb" }));
@@ -21,11 +22,35 @@ app.use(
 import healthCheckRouter from "./routes/healthcheck.js";
 import authRouter from "./routes/auth.js";
 import projectRouter from "./routes/project.js";
+import taskRouter from "./routes/task.js";
+import noteRouter from "./routes/note.js";
 app.use("/api/v1/healthcheck", healthCheckRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
+app.use("/api/v1/tasks", taskRouter);
+app.use("/api/v1/notes", noteRouter);
 
 app.get("/", (req, res) => {
   res.send("Welcome to basecampy");
 });
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err instanceof ApiError) {
+    return res.status(err.statuscode).json({
+      statusCode: err.statuscode,
+      message: err.message,
+      errors: err.error,
+      success: false,
+    });
+  }
+
+  return res.status(500).json({
+    statusCode: 500,
+    message: err.message || "Internal Server Error",
+    errors: [],
+    success: false,
+  });
+});
+
 export default app;
