@@ -4,6 +4,10 @@ import cookieParser from "cookie-parser";
 import { ApiError } from "./utils/api-error.js";
 const app = express();
 // basic configurations middleware hai
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.originalUrl}`);
+  next();
+});
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
@@ -35,7 +39,15 @@ app.get("/", (req, res) => {
 });
 
 // eslint-disable-next-line no-unused-vars
+
 app.use((err, req, res, next) => {
+  console.error("\n========== ERROR ==========");
+  console.error("URL:", req.originalUrl);
+  console.error("METHOD:", req.method);
+  console.error(err);
+  console.error(err.stack);
+  console.error("===========================\n");
+
   if (err instanceof ApiError) {
     return res.status(err.statuscode).json({
       statusCode: err.statuscode,
