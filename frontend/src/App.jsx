@@ -1,11 +1,6 @@
-function App() {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <p className="text-mono-label font-mono text-primary-fixed-dim uppercase tracking-widest">
-        Project Camp — initializing
-      </p>
-    </div>
-  )
-}
+import { RouterProvider } from 'react-router-dom'
+import router from './router'
 
-export default App
+export default function App() {
+  return <RouterProvider router={router} />
+}
