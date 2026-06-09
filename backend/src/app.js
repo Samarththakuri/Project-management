@@ -2,6 +2,12 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { ApiError } from "./utils/api-error.js";
+import healthCheckRouter from "./routes/healthcheck.js";
+import authRouter from "./routes/auth.js";
+import projectRouter from "./routes/project.js";
+import taskRouter from "./routes/task.js";
+import noteRouter from "./routes/note.js";
+import { requestLogger } from "./middleware/logger.js";
 const app = express();
 // basic configurations middleware hai
 app.use((req, res, next) => {
@@ -23,11 +29,7 @@ app.use(
 );
 
 // import the routes
-import healthCheckRouter from "./routes/healthcheck.js";
-import authRouter from "./routes/auth.js";
-import projectRouter from "./routes/project.js";
-import taskRouter from "./routes/task.js";
-import noteRouter from "./routes/note.js";
+app.use(requestLogger);
 app.use("/api/v1/healthcheck", healthCheckRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);

@@ -88,14 +88,15 @@ const login = asyncHandler(async (req, res) => {
   );
   const option = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   };
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken",
   );
   return res
     .status(200)
-    .cookie("accesstoken", accessToken, option)
+    .cookie("accessToken", accessToken, option)
     .cookie("refreshToken", refreshToken, option)
     .json(
       new ApiResponse(

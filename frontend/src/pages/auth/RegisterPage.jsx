@@ -1,45 +1,48 @@
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Link, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import { Button, Input, Checkbox } from '../../components/ui'
-import useAuthStore from '../../store/authStore'
-import { register as registerUser } from '../../api/auth.api'
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Button, Input, Checkbox } from "../../components/ui";
+import useAuthStore from "../../store/authStore";
+import { register as registerUser } from "../../api/auth.api";
 
 const schema = z.object({
-  fullName: z.string().min(2, 'Full name is required'),
-  email: z.string().email('Invalid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  terms: z.boolean().refine((v) => v === true, 'You must accept the terms'),
-})
+  username: z.string().min(2, "Full name is required"),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  terms: z.boolean().refine((v) => v === true, "You must accept the terms"),
+});
 
 export default function RegisterPage() {
-  const navigate = useNavigate()
-  const setUser = useAuthStore((s) => s.setUser)
-  const [serverError, setServerError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const navigate = useNavigate();
+  const setUser = useAuthStore((s) => s.setUser);
+  const [serverError, setServerError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) })
+  } = useForm({ resolver: zodResolver(schema) });
 
   async function onSubmit(data) {
-    setServerError('')
+    // console.log("FORM DATA:", data);
+    // console.log(data);
+    setServerError("");
     try {
       const res = await registerUser({
-        fullName: data.fullName,
+        username: data.username,
         email: data.email,
         password: data.password,
-      })
-      setSuccess(true)
+      });
+      // console.log("REGISTER RESPONSE:", res);
+      setSuccess(true);
     } catch (err) {
-      setServerError(err.response?.data?.message || 'Registration failed')
+      setServerError(err.response?.data?.message || "Registration failed");
     }
   }
-
+  // console.log(errors);
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left brand panel */}
@@ -110,7 +113,8 @@ export default function RegisterPage() {
                 Check your inbox
               </h2>
               <p className="text-body-md font-geist text-on-surface-variant mb-6">
-                A verification link has been sent to your email. Verify to activate your account.
+                A verification link has been sent to your email. Verify to
+                activate your account.
               </p>
               <Link to="/login">
                 <Button variant="secondary" className="w-full">
@@ -124,7 +128,9 @@ export default function RegisterPage() {
                 <p className="text-mono-label font-mono text-primary-fixed-dim uppercase tracking-widest mb-2">
                   New Operator
                 </p>
-                <h2 className="text-headline-md font-geist text-on-surface">Create account</h2>
+                <h2 className="text-headline-md font-geist text-on-surface">
+                  Create account
+                </h2>
               </div>
 
               {serverError && (
@@ -133,15 +139,18 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="flex flex-col gap-5"
+              >
                 <Input
-                  id="fullName"
+                  id="username"
                   label="Full Name"
                   type="text"
                   placeholder="Ada Lovelace"
                   icon="person"
-                  error={errors.fullName?.message}
-                  {...register('fullName')}
+                  error={errors.username?.message}
+                  {...register("username")}
                 />
                 <Input
                   id="email"
@@ -150,7 +159,7 @@ export default function RegisterPage() {
                   placeholder="you@company.com"
                   icon="mail"
                   error={errors.email?.message}
-                  {...register('email')}
+                  {...register("email")}
                 />
                 <Input
                   id="password"
@@ -159,22 +168,27 @@ export default function RegisterPage() {
                   placeholder="Min. 8 characters"
                   icon="lock"
                   error={errors.password?.message}
-                  {...register('password')}
+                  {...register("password")}
                 />
                 <Checkbox
                   id="terms"
                   label="I accept the terms of service"
                   error={errors.terms?.message}
-                  {...register('terms')}
+                  {...register("terms")}
                 />
 
-                <Button type="submit" size="lg" className="w-full mt-2" disabled={isSubmitting}>
-                  {isSubmitting ? 'Initializing...' : 'Initialize Sequence'}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full mt-2"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Initializing..." : "Initialize Sequence"}
                 </Button>
               </form>
 
               <p className="mt-6 text-body-md font-geist text-on-surface-variant text-center">
-                Already have access?{' '}
+                Already have access?{" "}
                 <Link
                   to="/login"
                   className="text-primary-fixed-dim hover:text-primary-fixed transition-colors"
@@ -187,5 +201,5 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
