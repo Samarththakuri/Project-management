@@ -20,6 +20,14 @@ export const TaskPriorityEnum = {
 };
 export const AvialableTaskPriority = Object.values(TaskPriorityEnum);
 
+export const NotificationTypeEnum = {
+  TASK_ASSIGNED: "task_assigned",
+  ADDED_TO_PROJECT: "added_to_project",
+  ROLE_CHANGED: "role_changed",
+  MENTIONED_IN_NOTE: "mentioned_in_note",
+};
+export const AvailableNotificationTypes = Object.values(NotificationTypeEnum);
+
 export const ActivityActionEnum = {
   PROJECT_CREATED: "project.created",
   PROJECT_UPDATED: "project.updated",

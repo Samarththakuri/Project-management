@@ -19,6 +19,7 @@ import {
   updateMemberRole,
   removeProjectMember,
 } from "../controllers/project.controllers.js";
+import { getProjectDashboard } from "../controllers/dashboard.controllers.js";
 
 const { ADMIN, PROJECT_ADMIN, MEMBER } = UserRolesEnum;
 const router = Router();
@@ -54,6 +55,10 @@ router
     validate(addMemberSchema),
     addProjectMember,
   );
+
+router
+  .route("/:projectId/dashboard")
+  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectDashboard);
 
 router
   .route("/:projectId/members/:userId")

@@ -118,7 +118,7 @@ frontend/src/
 | Item | Status | Notes |
 |---|---|---|
 | Horizontal sub-nav tabs (Overview / Board) | ✅ | Only shown when inside `/projects/:projectId/*`; active bottom border |
-| Notifications bell | ✅ | Static for now |
+| Notifications bell | ✅ | Live — polls every 30s; red dot badge on unread; opens `NotificationPanel` dropdown |
 | Command palette shortcut button (⌘K) | ✅ | Static display |
 | User avatar | ✅ | Reads from Zustand authStore; initials fallback |
 
@@ -227,4 +227,5 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 15. ❌ (Future) File attachments on tasks
 16. ❌ (Future) Add member to project from UI
 17. ❌ (Future) Task filters / search on board
-18. ❌ Dashboard KPIs — wire to real backend endpoint once Phase 3 (Dashboard Analytics) is built
+18. ✅ Dashboard KPIs — wired to real backend; 4-col KPI row (Open Tasks, In Progress, Overdue, Completed) aggregated across all user projects via `GET /projects/:id/dashboard`
+19. ✅ Notifications — bell polls every 30s, unread badge, `NotificationPanel` dropdown with mark-read; store: `notificationStore.js`; API: `notifications.api.js`

@@ -7,8 +7,9 @@ import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { UserRolesEnum, ActivityActionEnum } from "../utils/constants.js";
+import { UserRolesEnum, ActivityActionEnum, NotificationTypeEnum } from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
+import { sendNotification } from "../utils/notification.js";
 
 const getProjects = asyncHandler(async (req, res) => {
   const projects = await ProjectMember.aggregate([
@@ -157,7 +158,7 @@ const addProjectMember = asyncHandler(async (req, res) => {
   const member = await ProjectMember.create({
     user: user._id,
     project: projectId,
-    role,
+    role:role||UserRolesEnum.MEMBER,
   });
 
   await member.populate(
@@ -166,6 +167,17 @@ const addProjectMember = asyncHandler(async (req, res) => {
   );
 
   logActivity(req.user._id, ActivityActionEnum.MEMBER_ADDED, projectId, "member", user._id, { email: user.email, role });
+
+  const project = await Project.findById(projectId).select("name");
+  if (project) {
+    sendNotification(
+      user._id,
+      req.user._id,
+      projectId,
+      NotificationTypeEnum.ADDED_TO_PROJECT,
+      `${req.user.fullName || req.user.username} added you to "${project.name}" as ${role}`,
+    );
+  }
 
   return res
     .status(201)
@@ -187,6 +199,17 @@ const updateMemberRole = asyncHandler(async (req, res) => {
   }
 
   logActivity(req.user._id, ActivityActionEnum.MEMBER_ROLE_CHANGED, projectId, "member", member.user, { role });
+
+  const project = await Project.findById(projectId).select("name");
+  if (project) {
+    sendNotification(
+      userId,
+      req.user._id,
+      projectId,
+      NotificationTypeEnum.ROLE_CHANGED,
+      `${req.user.fullName || req.user.username} changed your role in "${project.name}" to ${role}`,
+    );
+  }
 
   return res
     .status(200)

@@ -1,49 +1,58 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   DndContext,
-  closestCenter,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
-} from '@dnd-kit/core'
+  useDroppable,
+} from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
   arrayMove,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { KanbanCard, Badge, Avatar, Button, Input } from '../../components/ui'
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { KanbanCard, Badge, Avatar, Button, Input } from "../../components/ui";
 import {
   getProjectTasks,
   createTask,
   updateTask,
   updateSubtask,
   reorderTasks,
-} from '../../api/tasks.api'
-import { getMembers } from '../../api/projects.api'
-import useAuthStore from '../../store/authStore'
+  deleteTask,
+} from "../../api/tasks.api";
+import { getMembers } from "../../api/projects.api";
+import useAuthStore from "../../store/authStore";
 
 const COLUMNS = [
-  { id: 'todo', label: 'Todo', icon: 'radio_button_unchecked' },
-  { id: 'in_progress', label: 'In Progress', icon: 'pending' },
-  { id: 'review', label: 'In Review', icon: 'rate_review' },
-  { id: 'done', label: 'Done', icon: 'check_circle' },
-]
+  { id: "todo", label: "Todo", icon: "radio_button_unchecked" },
+  { id: "in_progress", label: "In Progress", icon: "pending" },
+  { id: "review", label: "In Review", icon: "rate_review" },
+  { id: "done", label: "Done", icon: "check_circle" },
+];
 
-const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical']
+const PRIORITY_OPTIONS = ["low", "medium", "high", "critical"];
 
 /* ---- Sortable card wrapper ---- */
 function SortableCard({ task, onClick }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: task._id,
-  })
-  const style = { transform: CSS.Transform.toString(transform), transition }
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
   return (
     <div ref={setNodeRef} style={style}>
       <KanbanCard
@@ -54,28 +63,43 @@ function SortableCard({ task, onClick }) {
         isDragging={isDragging}
       />
     </div>
-  )
+  );
 }
 
 /* ---- Column ---- */
 function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
-  const [adding, setAdding] = useState(false)
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm({
-    resolver: zodResolver(z.object({
-      title: z.string().min(1),
-      priority: z.string().optional(),
-      dueDate: z.string().optional(),
-    })),
-  })
+  const [adding, setAdding] = useState(false);
+  const { setNodeRef } = useDroppable({
+    id: column.id,
+  });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { isSubmitting },
+  } = useForm({
+    resolver: zodResolver(
+      z.object({
+        title: z.string().min(1),
+        priority: z.string().optional(),
+        dueDate: z.string().optional(),
+      }),
+    ),
+  });
 
   async function submit(data) {
-    await onAddTask(column.id, data.title, data.priority || 'medium', data.dueDate || null)
-    reset()
-    setAdding(false)
+    await onAddTask(
+      column.id,
+      data.title,
+      data.priority || "medium",
+      data.dueDate || null,
+    );
+    reset();
+    setAdding(false);
   }
 
   return (
-    <div className="flex flex-col w-72 flex-shrink-0">
+    <div ref={setNodeRef} className="flex flex-col w-72 flex-shrink-0">
       {/* Column header */}
       <div className="flex items-center gap-2 mb-3 px-1">
         <span className="material-symbols-outlined text-[16px] text-on-surface-variant select-none">
@@ -84,12 +108,17 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
         <p className="text-mono-label font-mono text-on-surface uppercase tracking-widest flex-1">
           {column.label}
         </p>
-        <span className="text-mono-label font-mono text-on-surface-variant">{tasks.length}</span>
+        <span className="text-mono-label font-mono text-on-surface-variant">
+          {tasks.length}
+        </span>
       </div>
 
       {/* Cards */}
       <div className="flex flex-col gap-2 flex-1">
-        <SortableContext items={tasks.map((t) => t._id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={tasks.map((t) => t._id)}
+          strategy={verticalListSortingStrategy}
+        >
           {tasks.map((task) => (
             <SortableCard key={task._id} task={task} onClick={onCardClick} />
           ))}
@@ -97,7 +126,7 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
       </div>
 
       {/* Add Task (todo column, admin/project_admin only) */}
-      {column.id === 'todo' && canAddTask && (
+      {column.id === "todo" && canAddTask && (
         <div className="mt-3">
           {adding ? (
             <form
@@ -108,11 +137,11 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
                 autoFocus
                 placeholder="Task title..."
                 className="w-full bg-transparent text-body-md font-geist text-on-surface placeholder:text-on-surface-variant focus:outline-none"
-                {...register('title')}
+                {...register("title")}
               />
               <select
                 className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
-                {...register('priority')}
+                {...register("priority")}
               >
                 {PRIORITY_OPTIONS.map((p) => (
                   <option key={p} value={p} className="bg-surface-container">
@@ -123,7 +152,7 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
               <input
                 type="date"
                 className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
-                {...register('dueDate')}
+                {...register("dueDate")}
               />
               <div className="flex items-center gap-2">
                 <Button type="submit" size="sm" disabled={isSubmitting}>
@@ -133,7 +162,10 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setAdding(false); reset() }}
+                  onClick={() => {
+                    setAdding(false);
+                    reset();
+                  }}
                 >
                   Cancel
                 </Button>
@@ -144,42 +176,52 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
               onClick={() => setAdding(true)}
               className="w-full flex items-center gap-2 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-dashed border-outline-variant transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px] select-none">add</span>
-              <span className="text-mono-label font-mono uppercase tracking-widest">Add Task</span>
+              <span className="material-symbols-outlined text-[16px] select-none">
+                add
+              </span>
+              <span className="text-mono-label font-mono uppercase tracking-widest">
+                Add Task
+              </span>
             </button>
           )}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 /* ---- Task Detail Drawer ---- */
-function TaskDrawer({ task, onClose, onUpdate, projectId }) {
-  const [subtasks, setSubtasks] = useState(task?.subTasks || [])
+function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId }) {
+  const [subtasks, setSubtasks] = useState(task?.subTasks || []);
 
   useEffect(() => {
-    setSubtasks(task?.subTasks || [])
-  }, [task])
+    setSubtasks(task?.subTasks || []);
+  }, [task]);
 
   async function toggleSubtask(subtask) {
     try {
       await updateSubtask(projectId, task._id, subtask._id, {
         isCompleted: !subtask.isCompleted,
-      })
+      });
       setSubtasks((prev) =>
         prev.map((s) =>
           s._id === subtask._id ? { ...s, isCompleted: !s.isCompleted } : s,
         ),
-      )
+      );
     } catch {}
   }
 
-  const priorityVariant = { high: 'error', critical: 'error', medium: 'warning', low: 'default', normal: 'default' }
+  const priorityVariant = {
+    high: "error",
+    critical: "error",
+    medium: "warning",
+    low: "default",
+    normal: "default",
+  };
 
-  if (!task) return null
+  if (!task) return null;
 
-  const avatarSrc = task.assignee?.avatar?.url ?? task.assignee?.avatar ?? null
+  const avatarSrc = task.assignee?.avatar?.url ?? task.assignee?.avatar ?? null;
 
   return (
     <>
@@ -190,18 +232,23 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
           <div className="flex items-center gap-3">
-            <Badge variant={priorityVariant[task.priority] || 'default'}>
-              {task.priority || 'medium'}
+            <Badge variant={priorityVariant[task.priority] || "default"}>
+              {task.priority || "medium"}
             </Badge>
             <span className="text-mono-label font-mono text-on-surface-variant">
-              TK-{String(task._id || '').slice(-4).toUpperCase()}
+              TK-
+              {String(task._id || "")
+                .slice(-4)
+                .toUpperCase()}
             </span>
           </div>
           <button
             onClick={onClose}
             className="text-on-surface-variant hover:text-on-surface transition-colors"
           >
-            <span className="material-symbols-outlined text-[20px] select-none">close</span>
+            <span className="material-symbols-outlined text-[20px] select-none">
+              close
+            </span>
           </button>
         </div>
 
@@ -209,11 +256,21 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
           {/* Title + status */}
           <div>
-            <h2 className="text-headline-sm font-geist text-on-surface mb-2">{task.title}</h2>
+            <h2 className="text-headline-sm font-geist text-on-surface mb-2">
+              {task.title}
+            </h2>
             <Badge
-              variant={task.status === 'in_progress' ? 'primary' : task.status === 'review' ? 'warning' : task.status === 'done' ? 'default' : 'default'}
+              variant={
+                task.status === "in_progress"
+                  ? "primary"
+                  : task.status === "review"
+                    ? "warning"
+                    : task.status === "done"
+                      ? "default"
+                      : "default"
+              }
             >
-              {task.status.replace(/_/g, ' ')}
+              {task.status.replace(/_/g, " ")}
             </Badge>
           </div>
 
@@ -236,7 +293,13 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
                 Assignee
               </p>
               <div className="flex items-center gap-3">
-                <Avatar src={avatarSrc} name={task.assignee?.fullName || task.assignee?.username || ''} size="md" />
+                <Avatar
+                  src={avatarSrc}
+                  name={
+                    task.assignee?.fullName || task.assignee?.username || ""
+                  }
+                  size="md"
+                />
                 <p className="text-body-md font-geist text-on-surface">
                   {task.assignee?.fullName || task.assignee?.username}
                 </p>
@@ -251,10 +314,10 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
                 Due Date
               </p>
               <p className="text-body-md font-geist text-on-surface">
-                {new Date(task.dueDate).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
+                {new Date(task.dueDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
                 })}
               </p>
             </div>
@@ -268,7 +331,8 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
                   Subtasks
                 </p>
                 <span className="text-mono-label font-mono text-on-surface-variant">
-                  {subtasks.filter((s) => s.isCompleted).length}/{subtasks.length}
+                  {subtasks.filter((s) => s.isCompleted).length}/
+                  {subtasks.length}
                 </span>
               </div>
               <ul className="flex flex-col gap-2">
@@ -276,16 +340,25 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
                   <li key={subtask._id} className="flex items-center gap-3">
                     <button
                       onClick={() => toggleSubtask(subtask)}
-                      className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center transition-colors ${subtask.isCompleted ? 'bg-primary-fixed-dim border-primary-fixed-dim' : 'border-outline-variant bg-surface-container-low'}`}
+                      className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center transition-colors ${subtask.isCompleted ? "bg-primary-fixed-dim border-primary-fixed-dim" : "border-outline-variant bg-surface-container-low"}`}
                     >
                       {subtask.isCompleted && (
-                        <svg className="w-full h-full p-[3px]" viewBox="0 0 10 10" fill="none">
-                          <path d="M1.5 5L4 7.5L8.5 2.5" stroke="#002022" strokeWidth="1.8" strokeLinecap="square" />
+                        <svg
+                          className="w-full h-full p-[3px]"
+                          viewBox="0 0 10 10"
+                          fill="none"
+                        >
+                          <path
+                            d="M1.5 5L4 7.5L8.5 2.5"
+                            stroke="#002022"
+                            strokeWidth="1.8"
+                            strokeLinecap="square"
+                          />
                         </svg>
                       )}
                     </button>
                     <p
-                      className={`text-body-md font-geist ${subtask.isCompleted ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}
+                      className={`text-body-md font-geist ${subtask.isCompleted ? "text-on-surface-variant line-through" : "text-on-surface"}`}
                     >
                       {subtask.title}
                     </p>
@@ -294,110 +367,143 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
               </ul>
             </div>
           )}
+          {/* Delete Task */}
+          <div className="pt-4 border-t border-outline-variant">
+            <Button
+              variant="danger"
+              onClick={async () => {
+                try {
+                  await deleteTask(projectId, task._id);
+                  onDelete(task._id);
+                  onClose();
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+            >
+              Delete Task
+            </Button>
+          </div>
         </div>
       </div>
     </>
-  )
+  );
 }
 
 /* ---- Main Board Page ---- */
 export default function KanbanBoardPage() {
-  const { projectId } = useParams()
-  const { user } = useAuthStore()
-  const [tasks, setTasks] = useState([])
-  const [activeTask, setActiveTask] = useState(null)
-  const [selectedTask, setSelectedTask] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [canAddTask, setCanAddTask] = useState(false)
+  const { projectId } = useParams();
+  const { user } = useAuthStore();
+  const [tasks, setTasks] = useState([]);
+  const [activeTask, setActiveTask] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [canAddTask, setCanAddTask] = useState(false);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   function load() {
-    setLoading(true)
+    setLoading(true);
     Promise.all([getProjectTasks(projectId), getMembers(projectId)])
       .then(([tRes, mRes]) => {
-        setTasks(tRes.data.data || [])
-        const members = mRes.data.data || []
-        const me = members.find((m) => m.user?._id === user?._id)
-        const role = me?.role
-        setCanAddTask(role === 'admin' || role === 'project_admin')
+        setTasks(tRes.data.data || []);
+        const members = mRes.data.data || [];
+        const me = members.find((m) => m.user?._id === user?._id);
+        const role = me?.role;
+        setCanAddTask(role === "admin" || role === "project_admin");
       })
       .catch(() => {})
-      .finally(() => setLoading(false))
+      .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load() }, [projectId])
+  useEffect(() => {
+    load();
+  }, [projectId]);
 
-  const byStatus = (status) => tasks.filter((t) => t.status === status)
+  const byStatus = (status) => tasks.filter((t) => t.status === status);
 
   async function handleAddTask(status, title, priority, dueDate) {
     try {
-      const payload = { title, status, priority }
-      if (dueDate) payload.dueDate = new Date(dueDate).toISOString()
-      const res = await createTask(projectId, payload)
-      setTasks((prev) => [...prev, res.data.data])
+      const payload = { title, status, priority };
+      if (dueDate) payload.dueDate = new Date(dueDate).toISOString();
+      const res = await createTask(projectId, payload);
+      setTasks((prev) => [...prev, res.data.data]);
     } catch {}
   }
 
   function handleDragStart(event) {
-    setActiveTask(tasks.find((t) => t._id === event.active.id) || null)
+    setActiveTask(tasks.find((t) => t._id === event.active.id) || null);
+  }
+  function handleDeleteTask(taskId) {
+    setTasks((prev) => prev.filter((t) => t._id !== taskId));
   }
 
   async function handleDragEnd(event) {
-    const { active, over } = event
-    setActiveTask(null)
-    if (!over || active.id === over.id) return
+    const { active, over } = event;
+    setActiveTask(null);
+    if (!over || active.id === over.id) return;
 
-    const draggedTask = tasks.find((t) => t._id === active.id)
-    const overTask = tasks.find((t) => t._id === over.id)
+    const draggedTask = tasks.find((t) => t._id === active.id);
+    const overTask = tasks.find((t) => t._id === over.id);
 
-    if (!draggedTask) return
+    if (!draggedTask) return;
 
     if (overTask && draggedTask.status !== overTask.status) {
       // Cross-column: update status
-      const newStatus = overTask.status
+      const newStatus = overTask.status;
       setTasks((prev) =>
-        prev.map((t) => (t._id === active.id ? { ...t, status: newStatus } : t)),
-      )
+        prev.map((t) =>
+          t._id === active.id ? { ...t, status: newStatus } : t,
+        ),
+      );
       try {
-        await updateTask(projectId, active.id, { status: newStatus })
+        await updateTask(projectId, active.id, { status: newStatus });
       } catch {
-        load()
+        load();
       }
     } else if (overTask && draggedTask.status === overTask.status) {
       // Within-column: reorder
-      let reordered
+      let reordered;
       setTasks((prev) => {
-        const same = prev.filter((t) => t.status === draggedTask.status)
-        const other = prev.filter((t) => t.status !== draggedTask.status)
-        const oldIdx = same.findIndex((t) => t._id === active.id)
-        const newIdx = same.findIndex((t) => t._id === over.id)
-        const sorted = arrayMove(same, oldIdx, newIdx)
-        reordered = sorted.map((t, i) => ({ taskId: t._id, order: i }))
-        return [...other, ...sorted]
-      })
+        const same = prev.filter((t) => t.status === draggedTask.status);
+        const other = prev.filter((t) => t.status !== draggedTask.status);
+        const oldIdx = same.findIndex((t) => t._id === active.id);
+        const newIdx = same.findIndex((t) => t._id === over.id);
+        const sorted = arrayMove(same, oldIdx, newIdx);
+        reordered = sorted.map((t, i) => ({ taskId: t._id, order: i }));
+        return [...other, ...sorted];
+      });
       try {
-        if (reordered) await reorderTasks(projectId, reordered)
+        if (reordered) await reorderTasks(projectId, reordered);
       } catch {}
     } else {
       // Dropped on a column droppable (empty column)
-      const columnId = over.id
-      if (COLUMNS.some((c) => c.id === columnId) && draggedTask.status !== columnId) {
+      const columnId = over.id;
+      if (
+        COLUMNS.some((c) => c.id === columnId) &&
+        draggedTask.status !== columnId
+      ) {
         setTasks((prev) =>
-          prev.map((t) => (t._id === active.id ? { ...t, status: columnId } : t)),
-        )
+          prev.map((t) =>
+            t._id === active.id ? { ...t, status: columnId } : t,
+          ),
+        );
         try {
-          await updateTask(projectId, active.id, { status: columnId })
+          await updateTask(projectId, active.id, { status: columnId });
         } catch {
-          load()
+          load();
         }
       }
     }
   }
 
   function handleTaskUpdate(updatedTask) {
-    setTasks((prev) => prev.map((t) => (t._id === updatedTask._id ? updatedTask : t)))
-    setSelectedTask(updatedTask)
+    setTasks((prev) =>
+      prev.map((t) => (t._id === updatedTask._id ? updatedTask : t)),
+    );
+    setSelectedTask(updatedTask);
   }
 
   if (loading) {
@@ -407,7 +513,7 @@ export default function KanbanBoardPage() {
           Loading board...
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -417,13 +523,15 @@ export default function KanbanBoardPage() {
         <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-1">
           Kanban Board
         </p>
-        <h1 className="text-headline-md font-geist text-on-surface">Task Board</h1>
+        <h1 className="text-headline-md font-geist text-on-surface">
+          Task Board
+        </h1>
       </div>
 
       {/* Board */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
@@ -451,9 +559,10 @@ export default function KanbanBoardPage() {
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdate={handleTaskUpdate}
+          onDelete={handleDeleteTask}
           projectId={projectId}
         />
       )}
     </div>
-  )
+  );
 }

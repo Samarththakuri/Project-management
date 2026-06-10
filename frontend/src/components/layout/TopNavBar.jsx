@@ -1,9 +1,15 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useMatch } from 'react-router-dom'
 import { Avatar } from '../ui'
+import NotificationPanel from '../ui/NotificationPanel'
 import useAuthStore from '../../store/authStore'
+import useNotificationStore from '../../store/notificationStore'
+import { getNotifications } from '../../api/notifications.api'
 
 export default function TopNavBar() {
   const user = useAuthStore((s) => s.user)
+  const { setNotifications, unreadCount } = useNotificationStore()
+  const [isOpen, setIsOpen] = useState(false)
   const projectMatch = useMatch('/projects/:projectId/*')
   const projectId = projectMatch?.params?.projectId
 
@@ -13,6 +19,17 @@ export default function TopNavBar() {
         { to: `/projects/${projectId}/board`, label: 'Board', end: false },
       ]
     : []
+
+  useEffect(() => {
+    function fetchNotifications() {
+      getNotifications()
+        .then((res) => setNotifications(res.data.data || []))
+        .catch(() => {})
+    }
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [setNotifications])
 
   return (
     <header className="h-14 flex-shrink-0 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-6 sticky top-0 z-30">
@@ -45,14 +62,21 @@ export default function TopNavBar() {
         </div>
 
         {/* Notifications */}
-        <button
-          className="text-on-surface-variant hover:text-on-surface transition-colors"
-          aria-label="Notifications"
-        >
-          <span className="material-symbols-outlined text-[20px] select-none leading-none">
-            notifications
-          </span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsOpen((v) => !v)}
+            className="text-on-surface-variant hover:text-on-surface transition-colors"
+            aria-label="Notifications"
+          >
+            <span className="material-symbols-outlined text-[20px] select-none leading-none">
+              notifications
+            </span>
+          </button>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-error pointer-events-none" />
+          )}
+          {isOpen && <NotificationPanel onClose={() => setIsOpen(false)} />}
+        </div>
 
         {/* User avatar */}
         <Avatar

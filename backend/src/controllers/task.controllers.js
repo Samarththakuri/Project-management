@@ -4,8 +4,9 @@ import { ProjectMember } from "../model/projectmember.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { ActivityActionEnum } from "../utils/constants.js";
+import { ActivityActionEnum, NotificationTypeEnum } from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
+import { sendNotification } from "../utils/notification.js";
 
 const POPULATE_USER = "username fullName email avatar";
 
@@ -56,6 +57,16 @@ const createTask = asyncHandler(async (req, res) => {
 
   logActivity(req.user._id, ActivityActionEnum.TASK_CREATED, projectId, "task", task._id, { title: task.title });
 
+  if (assignee) {
+    sendNotification(
+      assignee,
+      req.user._id,
+      projectId,
+      NotificationTypeEnum.TASK_ASSIGNED,
+      `${req.user.fullName || req.user.username} assigned you to "${task.title}"`,
+    );
+  }
+
   return res
     .status(201)
     .json(new ApiResponse(201, task, "Task created successfully"));
@@ -93,6 +104,8 @@ const updateTask = asyncHandler(async (req, res) => {
     }
   }
 
+  const existingTask = await Task.findOne({ _id: taskId, project: projectId }).select("assignee");
+
   const updateFields = {};
   if (title !== undefined) updateFields.title = title;
   if (description !== undefined) updateFields.description = description;
@@ -112,6 +125,16 @@ const updateTask = asyncHandler(async (req, res) => {
   }
 
   logActivity(req.user._id, ActivityActionEnum.TASK_UPDATED, projectId, "task", task._id, { title: task.title });
+
+  if (assignee !== undefined && String(assignee) !== String(existingTask?.assignee)) {
+    sendNotification(
+      assignee,
+      req.user._id,
+      projectId,
+      NotificationTypeEnum.TASK_ASSIGNED,
+      `${req.user.fullName || req.user.username} assigned you to "${task.title}"`,
+    );
+  }
 
   return res
     .status(200)

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Badge, Avatar, ProgressBar } from '../../components/ui'
 import useAuthStore from '../../store/authStore'
 import { getProjects } from '../../api/projects.api'
+import { getProjectDashboard } from '../../api/dashboard.api'
 
 function useCountUp(target, duration = 1200) {
   const [count, setCount] = useState(0)
@@ -114,14 +115,32 @@ const MOCK_SCHEDULE = [
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const [projects, setProjects] = useState([])
+  const [kpis, setKpis] = useState({ todoTasks: 0, inProgressTasks: 0, overdueTasks: 0, completedTasks: 0 })
 
   useEffect(() => {
     getProjects()
-      .then((res) => setProjects(res.data.data || []))
+      .then(async (res) => {
+        const fetched = res.data.data || []
+        setProjects(fetched)
+        if (!fetched.length) return
+        const results = await Promise.allSettled(fetched.map((p) => getProjectDashboard(p._id)))
+        const totals = results.reduce(
+          (acc, r) => {
+            if (r.status !== 'fulfilled') return acc
+            const d = r.value.data.data
+            return {
+              todoTasks: acc.todoTasks + d.todoTasks,
+              inProgressTasks: acc.inProgressTasks + d.inProgressTasks,
+              overdueTasks: acc.overdueTasks + d.overdueTasks,
+              completedTasks: acc.completedTasks + d.completedTasks,
+            }
+          },
+          { todoTasks: 0, inProgressTasks: 0, overdueTasks: 0, completedTasks: 0 },
+        )
+        setKpis(totals)
+      })
       .catch(() => {})
   }, [])
-
-  const activeIssues = MOCK_QUEUE.filter((t) => t.status !== 'done').length
 
   return (
     <div className="max-w-container-max mx-auto">
@@ -136,9 +155,11 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 gap-gutter mb-8">
-        <KpiCard label="Active Issues" value={activeIssues} icon="bug_report" accent />
-        <KpiCard label="System Uptime" value={99} unit="%" icon="monitor_heart" />
+      <div className="grid grid-cols-4 gap-gutter mb-8">
+        <KpiCard label="Open Tasks" value={kpis.todoTasks} icon="radio_button_unchecked" />
+        <KpiCard label="In Progress" value={kpis.inProgressTasks} icon="timelapse" accent />
+        <KpiCard label="Overdue" value={kpis.overdueTasks} icon="warning" />
+        <KpiCard label="Completed" value={kpis.completedTasks} icon="check_circle" />
       </div>
 
       {/* Main content grid */}

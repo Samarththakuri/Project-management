@@ -8,6 +8,7 @@ import projectRouter from "./routes/project.js";
 import taskRouter from "./routes/task.js";
 import noteRouter from "./routes/note.js";
 import activityRouter from "./routes/activity.js";
+import notificationRouter from "./routes/notification.js";
 import { requestLogger } from "./middleware/logger.js";
 const app = express();
 // basic configurations middleware hai
@@ -37,6 +38,7 @@ app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/projects", taskRouter);
 app.use("/api/v1/projects", noteRouter);
 app.use("/api/v1/projects", activityRouter);
+app.use("/api/v1", notificationRouter);
 
 app.get("/", (req, res) => {
   res.send("Welcome to basecampy");
