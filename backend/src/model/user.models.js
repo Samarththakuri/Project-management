@@ -29,7 +29,7 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
     },
-    fullname: {
+    fullName: {
       type: String,
       trim: true,
     },
@@ -48,7 +48,7 @@ const userSchema = new Schema(
       type: String,
     },
     forgotPasswordExpiry: {
-      type: String,
+      type: Date,
     },
     emailVerificationToken: {
       type: String,

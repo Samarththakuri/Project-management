@@ -183,12 +183,13 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 
 | Item | Status | Notes |
 |---|---|---|
-| Render columns from task status (todo / in_progress / done) | ✅ | |
+| Render columns from task status (todo / in_progress / review / done) | ✅ | 4th "In Review" column added |
 | Task card click → open right drawer | ✅ | |
-| Drawer: task title, status badge, assignee, priority, due date, description, subtasks | ✅ | |
+| Drawer: task title, status badge, assignee, priority, due date, description, subtasks | ✅ | Avatar shape fixed (handles `{url,localPath}` object) |
 | Subtask checkbox toggle → PATCH subtask | ✅ | |
 | Drag-and-drop to change task status | ✅ | `@dnd-kit/core` + sortable |
-| Add Task button → inline form (Todo column) | ✅ | Gated to `admin` + `project_admin` only; hidden from `member` |
+| Drag-and-drop within column → reorder API call | ✅ | PATCH `/tasks/reorder` with `[{ taskId, order }]` |
+| Add Task button → inline form (Todo column) with priority + dueDate | ✅ | Priority select + date picker added; gated to `admin` + `project_admin` only |
 | Role-based UI — member management (Project Overview) | ✅ | Add member button (admin+project_admin); role-change select + remove button per row (admin only) |
 
 ---
@@ -226,3 +227,4 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 15. ❌ (Future) File attachments on tasks
 16. ❌ (Future) Add member to project from UI
 17. ❌ (Future) Task filters / search on board
+18. ❌ Dashboard KPIs — wire to real backend endpoint once Phase 3 (Dashboard Analytics) is built

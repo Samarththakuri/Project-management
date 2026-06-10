@@ -1,6 +1,6 @@
 import { Badge, Avatar } from '.'
 
-const priorityVariant = { high: 'error', medium: 'warning', low: 'default', normal: 'default' }
+const priorityVariant = { high: 'error', critical: 'error', medium: 'warning', low: 'default', normal: 'default' }
 
 export default function KanbanCard({ task, onClick, dragListeners, dragAttributes, isDragging }) {
   const subtaskDone = (task.subTasks || []).filter((s) => s.isCompleted).length
@@ -15,7 +15,7 @@ export default function KanbanCard({ task, onClick, dragListeners, dragAttribute
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <Badge variant={priorityVariant[task.priority] || 'default'}>
-          {task.priority || 'normal'}
+          {task.priority || 'medium'}
         </Badge>
         <span className="text-mono-label font-mono text-on-surface-variant flex-shrink-0">
           TK-{String(task._id || '').slice(-4).toUpperCase()}
@@ -35,7 +35,7 @@ export default function KanbanCard({ task, onClick, dragListeners, dragAttribute
         )}
         {task.assignee && (
           <Avatar
-            src={task.assignee?.avatar}
+            src={task.assignee?.avatar?.url ?? task.assignee?.avatar ?? null}
             name={task.assignee?.fullName || task.assignee?.username || ''}
             size="sm"
           />

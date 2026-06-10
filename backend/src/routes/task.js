@@ -6,6 +6,7 @@ import { UserRolesEnum } from "../utils/constants.js";
 import {
   createTaskSchema,
   updateTaskSchema,
+  reorderTasksSchema,
   createSubtaskSchema,
   updateSubtaskSchema,
 } from "../validators/task.schemas.js";
@@ -15,6 +16,7 @@ import {
   getTaskById,
   updateTask,
   deleteTask,
+  reorderTasks,
   createSubtask,
   updateSubtask,
   deleteSubtask,
@@ -36,6 +38,15 @@ router
     upload.array("attachments", 5),
     validate(createTaskSchema),
     createTask,
+  );
+
+router
+  .route("/:projectId/tasks/reorder")
+  .patch(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN),
+    validate(reorderTasksSchema),
+    reorderTasks,
   );
 
 router

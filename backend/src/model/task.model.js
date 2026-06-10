@@ -1,5 +1,10 @@
 import mongoose, { Schema } from "mongoose";
-import { TasksStatusEnum, AvialableTasksStatus } from "../utils/constants.js";
+import {
+  TasksStatusEnum,
+  AvialableTasksStatus,
+  TaskPriorityEnum,
+  AvialableTaskPriority,
+} from "../utils/constants.js";
 const taskSchema = new Schema(
   {
     title: {
@@ -13,11 +18,11 @@ const taskSchema = new Schema(
       ref: "Project",
       required: true,
     },
-    assignedTo: {
+    assignee: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    assignedBy: {
+    assigner: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
@@ -25,6 +30,19 @@ const taskSchema = new Schema(
       type: String,
       enum: AvialableTasksStatus,
       default: TasksStatusEnum.TODO,
+    },
+    priority: {
+      type: String,
+      enum: AvialableTaskPriority,
+      default: TaskPriorityEnum.MEDIUM,
+    },
+    dueDate: {
+      type: Date,
+      default: null,
+    },
+    order: {
+      type: Number,
+      default: 0,
     },
     attachments: {
       type: [

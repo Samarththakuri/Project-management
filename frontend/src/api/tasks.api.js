@@ -7,6 +7,8 @@ export const updateTask = (projectId, taskId, data) =>
   api.patch(`/projects/${projectId}/tasks/${taskId}`, data)
 export const deleteTask = (projectId, taskId) =>
   api.delete(`/projects/${projectId}/tasks/${taskId}`)
+export const reorderTasks = (projectId, tasks) =>
+  api.patch(`/projects/${projectId}/tasks/reorder`, { tasks })
 
 export const createSubtask = (projectId, taskId, data) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/subtasks`, data)

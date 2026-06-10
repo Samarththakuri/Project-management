@@ -18,12 +18,13 @@ import { CSS } from '@dnd-kit/utilities'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { KanbanCard, Badge, Avatar, Button, Input, Textarea, Select, Checkbox } from '../../components/ui'
+import { KanbanCard, Badge, Avatar, Button, Input } from '../../components/ui'
 import {
   getProjectTasks,
   createTask,
   updateTask,
   updateSubtask,
+  reorderTasks,
 } from '../../api/tasks.api'
 import { getMembers } from '../../api/projects.api'
 import useAuthStore from '../../store/authStore'
@@ -31,14 +32,11 @@ import useAuthStore from '../../store/authStore'
 const COLUMNS = [
   { id: 'todo', label: 'Todo', icon: 'radio_button_unchecked' },
   { id: 'in_progress', label: 'In Progress', icon: 'pending' },
+  { id: 'review', label: 'In Review', icon: 'rate_review' },
   { id: 'done', label: 'Done', icon: 'check_circle' },
 ]
 
-const addTaskSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-  priority: z.string().optional(),
-})
+const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical']
 
 /* ---- Sortable card wrapper ---- */
 function SortableCard({ task, onClick }) {
@@ -62,12 +60,16 @@ function SortableCard({ task, onClick }) {
 /* ---- Column ---- */
 function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
   const [adding, setAdding] = useState(false)
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
-    resolver: zodResolver(z.object({ title: z.string().min(1) })),
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm({
+    resolver: zodResolver(z.object({
+      title: z.string().min(1),
+      priority: z.string().optional(),
+      dueDate: z.string().optional(),
+    })),
   })
 
   async function submit(data) {
-    await onAddTask(column.id, data.title)
+    await onAddTask(column.id, data.title, data.priority || 'medium', data.dueDate || null)
     reset()
     setAdding(false)
   }
@@ -94,22 +96,45 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
         </SortableContext>
       </div>
 
-      {/* Add Task button (todo column, admin/project_admin only) */}
+      {/* Add Task (todo column, admin/project_admin only) */}
       {column.id === 'todo' && canAddTask && (
         <div className="mt-3">
           {adding ? (
-            <form onSubmit={handleSubmit(submit)} className="bg-surface-container border border-outline-variant p-3 flex flex-col gap-2">
+            <form
+              onSubmit={handleSubmit(submit)}
+              className="bg-surface-container border border-outline-variant p-3 flex flex-col gap-2"
+            >
               <input
                 autoFocus
                 placeholder="Task title..."
                 className="w-full bg-transparent text-body-md font-geist text-on-surface placeholder:text-on-surface-variant focus:outline-none"
                 {...register('title')}
               />
+              <select
+                className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
+                {...register('priority')}
+              >
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p} className="bg-surface-container">
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
+                {...register('dueDate')}
+              />
               <div className="flex items-center gap-2">
                 <Button type="submit" size="sm" disabled={isSubmitting}>
                   Add
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setAdding(false); reset() }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setAdding(false); reset() }}
+                >
                   Cancel
                 </Button>
               </div>
@@ -131,7 +156,6 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
 
 /* ---- Task Detail Drawer ---- */
 function TaskDrawer({ task, onClose, onUpdate, projectId }) {
-  const [editing, setEditing] = useState(false)
   const [subtasks, setSubtasks] = useState(task?.subTasks || [])
 
   useEffect(() => {
@@ -140,7 +164,7 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
 
   async function toggleSubtask(subtask) {
     try {
-      const res = await updateSubtask(projectId, task._id, subtask._id, {
+      await updateSubtask(projectId, task._id, subtask._id, {
         isCompleted: !subtask.isCompleted,
       })
       setSubtasks((prev) =>
@@ -151,24 +175,23 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
     } catch {}
   }
 
-  const priorityVariant = { high: 'error', medium: 'warning', low: 'default', normal: 'default' }
+  const priorityVariant = { high: 'error', critical: 'error', medium: 'warning', low: 'default', normal: 'default' }
 
   if (!task) return null
+
+  const avatarSrc = task.assignee?.avatar?.url ?? task.assignee?.avatar ?? null
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 z-50 w-[400px] bg-surface-container-low border-l border-outline-variant flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
           <div className="flex items-center gap-3">
             <Badge variant={priorityVariant[task.priority] || 'default'}>
-              {task.priority || 'normal'}
+              {task.priority || 'medium'}
             </Badge>
             <span className="text-mono-label font-mono text-on-surface-variant">
               TK-{String(task._id || '').slice(-4).toUpperCase()}
@@ -184,13 +207,13 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {/* Title */}
+          {/* Title + status */}
           <div>
             <h2 className="text-headline-sm font-geist text-on-surface mb-2">{task.title}</h2>
             <Badge
-              variant={task.status === 'in_progress' ? 'primary' : task.status === 'done' ? 'default' : 'default'}
+              variant={task.status === 'in_progress' ? 'primary' : task.status === 'review' ? 'warning' : task.status === 'done' ? 'default' : 'default'}
             >
-              {task.status.replace('_', ' ')}
+              {task.status.replace(/_/g, ' ')}
             </Badge>
           </div>
 
@@ -213,11 +236,7 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
                 Assignee
               </p>
               <div className="flex items-center gap-3">
-                <Avatar
-                  src={task.assignee?.avatar}
-                  name={task.assignee?.fullName || ''}
-                  size="md"
-                />
+                <Avatar src={avatarSrc} name={task.assignee?.fullName || task.assignee?.username || ''} size="md" />
                 <p className="text-body-md font-geist text-on-surface">
                   {task.assignee?.fullName || task.assignee?.username}
                 </p>
@@ -311,9 +330,11 @@ export default function KanbanBoardPage() {
 
   const byStatus = (status) => tasks.filter((t) => t.status === status)
 
-  async function handleAddTask(status, title) {
+  async function handleAddTask(status, title, priority, dueDate) {
     try {
-      const res = await createTask(projectId, { title, status })
+      const payload = { title, status, priority }
+      if (dueDate) payload.dueDate = new Date(dueDate).toISOString()
+      const res = await createTask(projectId, payload)
       setTasks((prev) => [...prev, res.data.data])
     } catch {}
   }
@@ -327,12 +348,13 @@ export default function KanbanBoardPage() {
     setActiveTask(null)
     if (!over || active.id === over.id) return
 
-    const activeTask = tasks.find((t) => t._id === active.id)
+    const draggedTask = tasks.find((t) => t._id === active.id)
     const overTask = tasks.find((t) => t._id === over.id)
 
-    if (!activeTask) return
+    if (!draggedTask) return
 
-    if (overTask && activeTask.status !== overTask.status) {
+    if (overTask && draggedTask.status !== overTask.status) {
+      // Cross-column: update status
       const newStatus = overTask.status
       setTasks((prev) =>
         prev.map((t) => (t._id === active.id ? { ...t, status: newStatus } : t)),
@@ -342,17 +364,25 @@ export default function KanbanBoardPage() {
       } catch {
         load()
       }
-    } else if (overTask && activeTask.status === overTask.status) {
+    } else if (overTask && draggedTask.status === overTask.status) {
+      // Within-column: reorder
+      let reordered
       setTasks((prev) => {
-        const same = prev.filter((t) => t.status === activeTask.status)
-        const other = prev.filter((t) => t.status !== activeTask.status)
+        const same = prev.filter((t) => t.status === draggedTask.status)
+        const other = prev.filter((t) => t.status !== draggedTask.status)
         const oldIdx = same.findIndex((t) => t._id === active.id)
         const newIdx = same.findIndex((t) => t._id === over.id)
-        return [...other, ...arrayMove(same, oldIdx, newIdx)]
+        const sorted = arrayMove(same, oldIdx, newIdx)
+        reordered = sorted.map((t, i) => ({ taskId: t._id, order: i }))
+        return [...other, ...sorted]
       })
+      try {
+        if (reordered) await reorderTasks(projectId, reordered)
+      } catch {}
     } else {
+      // Dropped on a column droppable (empty column)
       const columnId = over.id
-      if (COLUMNS.some((c) => c.id === columnId) && activeTask.status !== columnId) {
+      if (COLUMNS.some((c) => c.id === columnId) && draggedTask.status !== columnId) {
         setTasks((prev) =>
           prev.map((t) => (t._id === active.id ? { ...t, status: columnId } : t)),
         )

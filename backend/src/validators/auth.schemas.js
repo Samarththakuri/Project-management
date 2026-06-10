@@ -9,7 +9,7 @@ export const registerSchema = z.object({
     .toLowerCase()
     .regex(/^[a-z0-9_]+$/, "Username must be lowercase alphanumeric"),
   password: z.string().trim().min(1, "Password is required"),
-  fullname: z.string().trim().optional(),
+  fullName: z.string().trim().optional(),
 });
 
 export const loginSchema = z.object({

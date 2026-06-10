@@ -27,7 +27,7 @@ const generateAccessAndRefreshToken = async (userId) => {
   }
 };
 const registerUser = asyncHandler(async (request, response) => {
-  const { email, username, password } = request.body; // we destructure the data
+  const { email, username, password, fullName } = request.body; // we destructure the data
   const userexsists = await User.findOne({
     $or: [{ username }, { email }],
   });
@@ -38,6 +38,7 @@ const registerUser = asyncHandler(async (request, response) => {
     email,
     password,
     username,
+    fullName,
     isEmailVerified: false,
   });
   const { unHashedToken, hashedToken, tokenExpiry } =
@@ -75,7 +76,7 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Username or email is required");
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ $or: [{ email }, { username }] });
   if (!user) {
     throw new ApiError(400, "User does not exists");
   }
@@ -212,7 +213,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
     );
     const user = await User.findById(decodedToken?._id);
-    if (!incomingRefreshToken) {
+    if (!user?.refreshToken) {
       throw new ApiError(401, "Invalid refresh token");
     }
     if (incomingRefreshToken !== user?.refreshToken) {
@@ -242,7 +243,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid refresh token");
   }
 });
-const forgotPasswordReset = async (req, res) => {
+const forgotPasswordReset = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email });
   if (!user) {
@@ -270,7 +271,7 @@ const forgotPasswordReset = async (req, res) => {
         "Password reset mail has been sent on your mail",
       ),
     );
-};
+});
 const resetForgotPassword = asyncHandler(async (req, res) => {
   const { resetToken } = req.params;
   const { newPassword } = req.body;

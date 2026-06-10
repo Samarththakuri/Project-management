@@ -7,13 +7,14 @@ import { asyncHandler } from "../utils/async-handler.js";
 import { ActivityActionEnum } from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
 
+const POPULATE_USER = "username fullName email avatar";
+
 const getProjectTasks = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
 
-  const tasks = await Task.find({ project: projectId }).populate(
-    "assignedTo",
-    "username email avatar",
-  );
+  const tasks = await Task.find({ project: projectId })
+    .populate("assignee", POPULATE_USER)
+    .sort({ order: 1 });
 
   return res
     .status(200)
@@ -22,14 +23,17 @@ const getProjectTasks = asyncHandler(async (req, res) => {
 
 const createTask = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const { title, description, assignedTo, status } = req.body;
+  const { title, description, assignee, status, priority, dueDate } = req.body;
 
-  if (assignedTo) {
-    const isMember = await ProjectMember.findOne({ project: projectId, user: assignedTo });
+  if (assignee) {
+    const isMember = await ProjectMember.findOne({ project: projectId, user: assignee });
     if (!isMember) {
       throw new ApiError(400, "Assigned user is not a member of this project");
     }
   }
+
+  const taskStatus = status || "todo";
+  const order = await Task.countDocuments({ project: projectId, status: taskStatus });
 
   const attachments = (req.files || []).map((file) => ({
     url: `/uploads/tasks/${file.filename}`,
@@ -41,9 +45,12 @@ const createTask = asyncHandler(async (req, res) => {
     title,
     description,
     project: projectId,
-    assignedTo,
-    assignedBy: req.user._id,
-    status,
+    assignee,
+    assigner: req.user._id,
+    status: taskStatus,
+    priority,
+    dueDate: dueDate || null,
+    order,
     attachments,
   });
 
@@ -58,8 +65,8 @@ const getTaskById = asyncHandler(async (req, res) => {
   const { projectId, taskId } = req.params;
 
   const task = await Task.findOne({ _id: taskId, project: projectId })
-    .populate("assignedTo", "username email avatar")
-    .populate("assignedBy", "username email avatar");
+    .populate("assignee", POPULATE_USER)
+    .populate("assigner", POPULATE_USER);
 
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -67,7 +74,7 @@ const getTaskById = asyncHandler(async (req, res) => {
 
   const subtasks = await Subtask.find({ task: taskId }).populate(
     "createdBy",
-    "username email avatar",
+    POPULATE_USER,
   );
 
   return res
@@ -77,10 +84,10 @@ const getTaskById = asyncHandler(async (req, res) => {
 
 const updateTask = asyncHandler(async (req, res) => {
   const { projectId, taskId } = req.params;
-  const { title, description, assignedTo, status } = req.body;
+  const { title, description, assignee, status, priority, dueDate } = req.body;
 
-  if (assignedTo !== undefined) {
-    const isMember = await ProjectMember.findOne({ project: projectId, user: assignedTo });
+  if (assignee !== undefined) {
+    const isMember = await ProjectMember.findOne({ project: projectId, user: assignee });
     if (!isMember) {
       throw new ApiError(400, "Assigned user is not a member of this project");
     }
@@ -89,8 +96,10 @@ const updateTask = asyncHandler(async (req, res) => {
   const updateFields = {};
   if (title !== undefined) updateFields.title = title;
   if (description !== undefined) updateFields.description = description;
-  if (assignedTo !== undefined) updateFields.assignedTo = assignedTo;
+  if (assignee !== undefined) updateFields.assignee = assignee;
   if (status !== undefined) updateFields.status = status;
+  if (priority !== undefined) updateFields.priority = priority;
+  if (dueDate !== undefined) updateFields.dueDate = dueDate || null;
 
   const task = await Task.findOneAndUpdate(
     { _id: taskId, project: projectId },
@@ -125,6 +134,24 @@ const deleteTask = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Task deleted successfully"));
+});
+
+const reorderTasks = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const { tasks } = req.body;
+
+  await Promise.all(
+    tasks.map(({ taskId, order }) =>
+      Task.findOneAndUpdate(
+        { _id: taskId, project: projectId },
+        { $set: { order } },
+      ),
+    ),
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Tasks reordered successfully"));
 });
 
 const createSubtask = asyncHandler(async (req, res) => {
@@ -206,6 +233,7 @@ export {
   getTaskById,
   updateTask,
   deleteTask,
+  reorderTasks,
   createSubtask,
   updateSubtask,
   deleteSubtask,

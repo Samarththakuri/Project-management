@@ -1,9 +1,5 @@
 import mongoose, { Schema } from "mongoose";
-import {
-  UserRolesEnum,
-  AvialableUserRole,
-  AvialableTasksStatus,
-} from "../utils/constants.js";
+import { UserRolesEnum, AvialableUserRole } from "../utils/constants.js";
 const projectMemberSchema = new Schema(
   {
     user: {
@@ -24,6 +20,8 @@ const projectMemberSchema = new Schema(
   },
   { timestamps: true },
 );
+
+projectMemberSchema.index({ user: 1, project: 1 }, { unique: true });
 
 export const ProjectMember = mongoose.model(
   "ProjectMember",
