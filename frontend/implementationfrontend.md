@@ -95,8 +95,8 @@ frontend/src/
 |---|---|---|---|
 | Dashboard | `/dashboard` | ✅ | KPI cards (Active Issues, System Uptime), Recent Activity feed, Your Queue, Today's Schedule. Animated number counters on load. |
 | Projects List | `/projects` | ✅ | Grid of project cards with name, description, member count, progress bar. Empty state. |
-| Project Overview | `/projects/:projectId` | ✅ | Bento grid: Priority Tasks, Team, Task Stats. Project header with progress bar + team avatars. |
-| Kanban Board | `/projects/:projectId/board` | ✅ | Three columns: Todo, In Progress, Done. Task cards with priority badge, ID, subtask count, assignee avatar. Right drawer for task detail. "Add Task" inline form on Todo column. dnd-kit drag-and-drop. |
+| Project Overview | `/projects/:projectId` | ✅ | Bento grid: Priority Tasks, Team, Task Stats. Project header with progress bar + team avatars. Team panel has role-based member management: add member (admin+project_admin), change role + remove member (admin only). |
+| Kanban Board | `/projects/:projectId/board` | ✅ | Three columns: Todo, In Progress, Done. Task cards with priority badge, ID, subtask count, assignee avatar. Right drawer for task detail. "Add Task" button gated to admin/project_admin. dnd-kit drag-and-drop. |
 | Chat | `/projects/:projectId/chat` | ❌ | Future enhancement — skip for v1. |
 | Settings | `/settings` | ✅ | User profile, change password, sign out. |
 
@@ -188,7 +188,8 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 | Drawer: task title, status badge, assignee, priority, due date, description, subtasks | ✅ | |
 | Subtask checkbox toggle → PATCH subtask | ✅ | |
 | Drag-and-drop to change task status | ✅ | `@dnd-kit/core` + sortable |
-| Add Task button → inline form (Todo column) | ✅ | Inline expand/collapse form |
+| Add Task button → inline form (Todo column) | ✅ | Gated to `admin` + `project_admin` only; hidden from `member` |
+| Role-based UI — member management (Project Overview) | ✅ | Add member button (admin+project_admin); role-change select + remove button per row (admin only) |
 
 ---
 

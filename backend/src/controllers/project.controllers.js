@@ -4,7 +4,8 @@ import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { UserRolesEnum } from "../utils/constants.js";
+import { UserRolesEnum, ActivityActionEnum } from "../utils/constants.js";
+import { logActivity } from "../utils/activity.js";
 
 const getProjects = asyncHandler(async (req, res) => {
   const projects = await ProjectMember.aggregate([
@@ -55,6 +56,8 @@ const createProject = asyncHandler(async (req, res) => {
     role: UserRolesEnum.ADMIN,
   });
 
+  logActivity(req.user._id, ActivityActionEnum.PROJECT_CREATED, project._id, "project", project._id, { name: project.name });
+
   return res
     .status(201)
     .json(new ApiResponse(201, project, "Project created successfully"));
@@ -85,6 +88,8 @@ const updateProject = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
+  logActivity(req.user._id, ActivityActionEnum.PROJECT_UPDATED, project._id, "project", project._id, { name: project.name });
+
   return res
     .status(200)
     .json(new ApiResponse(200, project, "Project updated successfully"));
@@ -100,6 +105,8 @@ const deleteProject = asyncHandler(async (req, res) => {
   }
 
   await ProjectMember.deleteMany({ project: projectId });
+
+  logActivity(req.user._id, ActivityActionEnum.PROJECT_DELETED, projectId, "project", projectId, { name: project.name });
 
   return res
     .status(200)
@@ -147,6 +154,8 @@ const addProjectMember = asyncHandler(async (req, res) => {
     "-password -refreshToken -emailVerificationToken -emailVerificationExpiry -forgotPasswordToken -forgotPasswordExpiry",
   );
 
+  logActivity(req.user._id, ActivityActionEnum.MEMBER_ADDED, projectId, "member", user._id, { email: user.email, role });
+
   return res
     .status(201)
     .json(new ApiResponse(201, member, "Member added successfully"));
@@ -166,6 +175,8 @@ const updateMemberRole = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Member not found in this project");
   }
 
+  logActivity(req.user._id, ActivityActionEnum.MEMBER_ROLE_CHANGED, projectId, "member", member.user, { role });
+
   return res
     .status(200)
     .json(new ApiResponse(200, member, "Member role updated successfully"));
@@ -182,6 +193,8 @@ const removeProjectMember = asyncHandler(async (req, res) => {
   if (!member) {
     throw new ApiError(404, "Member not found in this project");
   }
+
+  logActivity(req.user._id, ActivityActionEnum.MEMBER_REMOVED, projectId, "member", member.user);
 
   return res
     .status(200)

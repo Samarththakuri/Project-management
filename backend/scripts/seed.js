@@ -51,7 +51,16 @@ const seed = async () => {
   await Note.insertMany(notesData);
   console.log(`Seeded ${notesData.length} notes`);
 
-  console.log("Seed complete");
+  console.log("\nSeed complete ✓");
+  console.log("\n─────────────────────────────────────────────");
+  console.log("  TEST CREDENTIALS  (password: Password@123)");
+  console.log("─────────────────────────────────────────────");
+  console.log("  alice@example.com  →  admin      on 'Project Camp'");
+  console.log("  bob@example.com    →  project_admin on 'Project Camp'");
+  console.log("                        admin      on 'Marketing Site Redesign'");
+  console.log("  carol@example.com  →  member     on both projects");
+  console.log("  dave@example.com   →  member     on 'Marketing Site Redesign' only");
+  console.log("─────────────────────────────────────────────\n");
   await mongoose.disconnect();
   process.exit(0);
 };

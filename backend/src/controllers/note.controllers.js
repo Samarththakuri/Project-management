@@ -2,6 +2,8 @@ import { Note } from "../model/note.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
+import { ActivityActionEnum } from "../utils/constants.js";
+import { logActivity } from "../utils/activity.js";
 
 const getProjectNotes = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
@@ -24,6 +26,8 @@ const createNote = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
     content,
   });
+
+  logActivity(req.user._id, ActivityActionEnum.NOTE_CREATED, projectId, "note", note._id);
 
   return res
     .status(201)
@@ -60,6 +64,8 @@ const updateNote = asyncHandler(async (req, res) => {
   note.content = content;
   await note.save();
 
+  logActivity(req.user._id, ActivityActionEnum.NOTE_UPDATED, projectId, "note", note._id);
+
   return res
     .status(200)
     .json(new ApiResponse(200, note, "Note updated successfully"));
@@ -75,6 +81,8 @@ const deleteNote = asyncHandler(async (req, res) => {
   }
 
   await Note.findByIdAndDelete(noteId);
+
+  logActivity(req.user._id, ActivityActionEnum.NOTE_DELETED, projectId, "note", note._id);
 
   return res
     .status(200)

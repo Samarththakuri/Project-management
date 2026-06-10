@@ -4,6 +4,8 @@ import { ProjectMember } from "../model/projectmember.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
+import { ActivityActionEnum } from "../utils/constants.js";
+import { logActivity } from "../utils/activity.js";
 
 const getProjectTasks = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
@@ -44,6 +46,8 @@ const createTask = asyncHandler(async (req, res) => {
     status,
     attachments,
   });
+
+  logActivity(req.user._id, ActivityActionEnum.TASK_CREATED, projectId, "task", task._id, { title: task.title });
 
   return res
     .status(201)
@@ -98,6 +102,8 @@ const updateTask = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Task not found");
   }
 
+  logActivity(req.user._id, ActivityActionEnum.TASK_UPDATED, projectId, "task", task._id, { title: task.title });
+
   return res
     .status(200)
     .json(new ApiResponse(200, task, "Task updated successfully"));
@@ -113,6 +119,8 @@ const deleteTask = asyncHandler(async (req, res) => {
   }
 
   await Subtask.deleteMany({ task: taskId });
+
+  logActivity(req.user._id, ActivityActionEnum.TASK_DELETED, projectId, "task", taskId, { title: task.title });
 
   return res
     .status(200)
@@ -133,6 +141,8 @@ const createSubtask = asyncHandler(async (req, res) => {
     task: taskId,
     createdBy: req.user._id,
   });
+
+  logActivity(req.user._id, ActivityActionEnum.SUBTASK_CREATED, projectId, "subtask", subtask._id, { title: subtask.title });
 
   return res
     .status(201)
@@ -161,6 +171,10 @@ const updateSubtask = asyncHandler(async (req, res) => {
     { $set: updateFields },
     { new: true },
   );
+
+  if (isCompleted !== undefined) {
+    logActivity(req.user._id, ActivityActionEnum.SUBTASK_COMPLETED, projectId, "subtask", updated._id, { isCompleted: updated.isCompleted });
+  }
 
   return res
     .status(200)

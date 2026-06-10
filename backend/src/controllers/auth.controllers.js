@@ -27,7 +27,7 @@ const generateAccessAndRefreshToken = async (userId) => {
   }
 };
 const registerUser = asyncHandler(async (request, response) => {
-  const { email, username, password, role } = request.body; // we destructure the data
+  const { email, username, password } = request.body; // we destructure the data
   const userexsists = await User.findOne({
     $or: [{ username }, { email }],
   });

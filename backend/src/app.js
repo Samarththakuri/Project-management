@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.js";
 import projectRouter from "./routes/project.js";
 import taskRouter from "./routes/task.js";
 import noteRouter from "./routes/note.js";
+import activityRouter from "./routes/activity.js";
 import { requestLogger } from "./middleware/logger.js";
 const app = express();
 // basic configurations middleware hai
@@ -33,8 +34,9 @@ app.use(requestLogger);
 app.use("/api/v1/healthcheck", healthCheckRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
-app.use("/api/v1/tasks", taskRouter);
-app.use("/api/v1/notes", noteRouter);
+app.use("/api/v1/projects", taskRouter);
+app.use("/api/v1/projects", noteRouter);
+app.use("/api/v1/projects", activityRouter);
 
 app.get("/", (req, res) => {
   res.send("Welcome to basecampy");

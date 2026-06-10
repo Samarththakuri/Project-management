@@ -13,3 +13,20 @@ export const TasksStatusEnum = {
 // This means we are exporting a constant variable called AvailableTasksStatus that holds this array of valid statuses.
 
 export const AvialableTasksStatus = Object.values(TasksStatusEnum);
+
+export const ActivityActionEnum = {
+  PROJECT_CREATED: "project.created",
+  PROJECT_UPDATED: "project.updated",
+  PROJECT_DELETED: "project.deleted",
+  MEMBER_ADDED: "member.added",
+  MEMBER_REMOVED: "member.removed",
+  MEMBER_ROLE_CHANGED: "member.role_changed",
+  TASK_CREATED: "task.created",
+  TASK_UPDATED: "task.updated",
+  TASK_DELETED: "task.deleted",
+  SUBTASK_CREATED: "subtask.created",
+  SUBTASK_COMPLETED: "subtask.completed",
+  NOTE_CREATED: "note.created",
+  NOTE_UPDATED: "note.updated",
+  NOTE_DELETED: "note.deleted",
+};

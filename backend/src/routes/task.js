@@ -24,8 +24,12 @@ const { ADMIN, PROJECT_ADMIN, MEMBER } = UserRolesEnum;
 const router = Router();
 
 router
-  .route("/:projectId")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectTasks)
+  .route("/:projectId/tasks")
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectTasks,
+  )
   .post(
     verifyJWT,
     verifyProjectRole(ADMIN, PROJECT_ADMIN),
@@ -35,9 +39,9 @@ router
   );
 
 router
-  .route("/:projectId/t/:taskId")
+  .route("/:projectId/tasks/:taskId")
   .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getTaskById)
-  .put(
+  .patch(
     verifyJWT,
     verifyProjectRole(ADMIN, PROJECT_ADMIN),
     validate(updateTaskSchema),
@@ -46,7 +50,7 @@ router
   .delete(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN), deleteTask);
 
 router
-  .route("/:projectId/t/:taskId/subtasks")
+  .route("/:projectId/tasks/:taskId/subtasks")
   .post(
     verifyJWT,
     verifyProjectRole(ADMIN, PROJECT_ADMIN),
@@ -55,8 +59,8 @@ router
   );
 
 router
-  .route("/:projectId/st/:subTaskId")
-  .put(
+  .route("/:projectId/tasks/:taskId/subtasks/:subTaskId")
+  .patch(
     verifyJWT,
     verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
     validate(updateSubtaskSchema),

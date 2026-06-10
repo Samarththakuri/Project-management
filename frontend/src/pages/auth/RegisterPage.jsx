@@ -147,7 +147,7 @@ export default function RegisterPage() {
                   id="username"
                   label="Full Name"
                   type="text"
-                  placeholder="Ada Lovelace"
+                  placeholder="Name"
                   icon="person"
                   error={errors.username?.message}
                   {...register("username")}
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                   id="email"
                   label="Work Email"
                   type="email"
-                  placeholder="you@company.com"
+                  placeholder="you@email.com"
                   icon="mail"
                   error={errors.email?.message}
                   {...register("email")}

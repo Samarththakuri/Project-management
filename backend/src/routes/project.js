@@ -28,18 +28,41 @@ router.route("/").post(verifyJWT, validate(createProjectSchema), createProject);
 
 router
   .route("/:projectId")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectById)
-  .put(verifyJWT, verifyProjectRole(ADMIN), validate(updateProjectSchema), updateProject)
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectById,
+  )
+  .patch(
+    verifyJWT,
+    verifyProjectRole(ADMIN),
+    validate(updateProjectSchema),
+    updateProject,
+  )
   .delete(verifyJWT, verifyProjectRole(ADMIN), deleteProject);
 
 router
   .route("/:projectId/members")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectMembers)
-  .post(verifyJWT, verifyProjectRole(ADMIN), validate(addMemberSchema), addProjectMember);
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectMembers,
+  )
+  .post(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN),
+    validate(addMemberSchema),
+    addProjectMember,
+  );
 
 router
   .route("/:projectId/members/:userId")
-  .put(verifyJWT, verifyProjectRole(ADMIN), validate(updateMemberRoleSchema), updateMemberRole)
+  .patch(
+    verifyJWT,
+    verifyProjectRole(ADMIN),
+    validate(updateMemberRoleSchema),
+    updateMemberRole,
+  )
   .delete(verifyJWT, verifyProjectRole(ADMIN), removeProjectMember);
 
 export default router;

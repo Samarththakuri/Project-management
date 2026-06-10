@@ -25,6 +25,8 @@ import {
   updateTask,
   updateSubtask,
 } from '../../api/tasks.api'
+import { getMembers } from '../../api/projects.api'
+import useAuthStore from '../../store/authStore'
 
 const COLUMNS = [
   { id: 'todo', label: 'Todo', icon: 'radio_button_unchecked' },
@@ -58,7 +60,7 @@ function SortableCard({ task, onClick }) {
 }
 
 /* ---- Column ---- */
-function Column({ column, tasks, onCardClick, onAddTask }) {
+function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
   const [adding, setAdding] = useState(false)
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(z.object({ title: z.string().min(1) })),
@@ -92,8 +94,8 @@ function Column({ column, tasks, onCardClick, onAddTask }) {
         </SortableContext>
       </div>
 
-      {/* Add Task button (only on todo column) */}
-      {column.id === 'todo' && (
+      {/* Add Task button (todo column, admin/project_admin only) */}
+      {column.id === 'todo' && canAddTask && (
         <div className="mt-3">
           {adding ? (
             <form onSubmit={handleSubmit(submit)} className="bg-surface-container border border-outline-variant p-3 flex flex-col gap-2">
@@ -282,17 +284,25 @@ function TaskDrawer({ task, onClose, onUpdate, projectId }) {
 /* ---- Main Board Page ---- */
 export default function KanbanBoardPage() {
   const { projectId } = useParams()
+  const { user } = useAuthStore()
   const [tasks, setTasks] = useState([])
   const [activeTask, setActiveTask] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [canAddTask, setCanAddTask] = useState(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   function load() {
     setLoading(true)
-    getProjectTasks(projectId)
-      .then((res) => setTasks(res.data.data || []))
+    Promise.all([getProjectTasks(projectId), getMembers(projectId)])
+      .then(([tRes, mRes]) => {
+        setTasks(tRes.data.data || [])
+        const members = mRes.data.data || []
+        const me = members.find((m) => m.user?._id === user?._id)
+        const role = me?.role
+        setCanAddTask(role === 'admin' || role === 'project_admin')
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -395,6 +405,7 @@ export default function KanbanBoardPage() {
               tasks={byStatus(col.id)}
               onCardClick={setSelectedTask}
               onAddTask={handleAddTask}
+              canAddTask={canAddTask}
             />
           ))}
         </div>
