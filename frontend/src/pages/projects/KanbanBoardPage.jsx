@@ -29,6 +29,12 @@ import {
   deleteTask,
 } from "../../api/tasks.api";
 import { getMembers } from "../../api/projects.api";
+import {
+  getTaskComments,
+  createComment,
+  updateComment,
+  deleteComment,
+} from "../../api/comments.api";
 import useAuthStore from "../../store/authStore";
 
 const COLUMNS = [
@@ -191,12 +197,26 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
 }
 
 /* ---- Task Detail Drawer ---- */
-function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId }) {
+function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged }) {
+  const { user } = useAuthStore();
   const [subtasks, setSubtasks] = useState(task?.subTasks || []);
+  const [comments, setComments] = useState([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editContent, setEditContent] = useState("");
 
   useEffect(() => {
     setSubtasks(task?.subTasks || []);
   }, [task]);
+
+  useEffect(() => {
+    if (!task?._id) return;
+    setComments([]);
+    getTaskComments(projectId, task._id)
+      .then((res) => setComments(res.data.data || []))
+      .catch(() => {});
+  }, [task?._id, projectId]);
 
   async function toggleSubtask(subtask) {
     try {
@@ -208,6 +228,39 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId }) {
           s._id === subtask._id ? { ...s, isCompleted: !s.isCompleted } : s,
         ),
       );
+    } catch {}
+  }
+
+  async function handleAddComment() {
+    const content = commentInput.trim();
+    if (!content || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      const res = await createComment(projectId, task._id, { content });
+      setComments((prev) => [...prev, res.data.data]);
+      setCommentInput("");
+    } catch {} finally {
+      setSubmittingComment(false);
+    }
+  }
+
+  async function handleEditComment(commentId) {
+    const content = editContent.trim();
+    if (!content) return;
+    try {
+      const res = await updateComment(projectId, task._id, commentId, { content });
+      setComments((prev) =>
+        prev.map((c) => (c._id === commentId ? res.data.data : c)),
+      );
+      setEditingId(null);
+      setEditContent("");
+    } catch {}
+  }
+
+  async function handleDeleteComment(commentId) {
+    try {
+      await deleteComment(projectId, task._id, commentId);
+      setComments((prev) => prev.filter((c) => c._id !== commentId));
     } catch {}
   }
 
@@ -367,6 +420,132 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId }) {
               </ul>
             </div>
           )}
+
+          {/* Comments */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest">
+                Comments
+              </p>
+              {comments.length > 0 && (
+                <span className="text-mono-label font-mono text-on-surface-variant">
+                  {comments.length}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {comments.map((comment) => {
+                const isOwn = comment.createdBy?._id === user?._id;
+                const canModify = isOwn || isPrivileged;
+                const commenterAvatar =
+                  comment.createdBy?.avatar?.url ?? comment.createdBy?.avatar ?? null;
+
+                return (
+                  <div
+                    key={comment._id}
+                    className="p-3 bg-surface-container border border-outline-variant"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        src={commenterAvatar}
+                        name={comment.createdBy?.username || ""}
+                        size="sm"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-mono-label font-mono text-on-surface-variant">
+                            {comment.createdBy?.username}
+                          </span>
+                          <span className="text-mono-label font-mono text-on-surface-variant opacity-60 flex-shrink-0">
+                            {new Date(comment.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+
+                        {editingId === comment._id ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              autoFocus
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.ctrlKey && e.key === "Enter") handleEditComment(comment._id);
+                                if (e.key === "Escape") { setEditingId(null); setEditContent(""); }
+                              }}
+                              rows={2}
+                              className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditComment(comment._id)}
+                                className="text-mono-label font-mono text-primary uppercase tracking-widest hover:opacity-80"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => { setEditingId(null); setEditContent(""); }}
+                                className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest hover:opacity-80"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-body-md font-geist text-on-surface break-words">
+                            {comment.content}
+                          </p>
+                        )}
+                      </div>
+
+                      {canModify && editingId !== comment._id && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => { setEditingId(comment._id); setEditContent(comment.content); }}
+                            className="text-on-surface-variant hover:text-on-surface transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[16px] select-none">edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="text-on-surface-variant hover:text-error transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[16px] select-none">delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* New comment input */}
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === "Enter") handleAddComment();
+                  }}
+                  placeholder="Add a comment... (Ctrl+Enter to submit)"
+                  rows={2}
+                  className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface placeholder:text-on-surface-variant p-3 focus:outline-none focus:border-primary resize-none"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleAddComment}
+                    disabled={!commentInput.trim() || submittingComment}
+                  >
+                    Comment
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Delete Task */}
           <div className="pt-4 border-t border-outline-variant">
             <Button
@@ -561,6 +740,7 @@ export default function KanbanBoardPage() {
           onUpdate={handleTaskUpdate}
           onDelete={handleDeleteTask}
           projectId={projectId}
+          isPrivileged={canAddTask}
         />
       )}
     </div>

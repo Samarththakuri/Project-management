@@ -43,7 +43,8 @@ frontend/src/
 │   ├── auth.api.js       ✅
 │   ├── projects.api.js   ✅
 │   ├── tasks.api.js      ✅
-│   └── notes.api.js      ✅
+│   ├── notes.api.js      ✅
+│   └── comments.api.js   ✅
 ├── components/
 │   ├── layout/
 │   │   ├── SideNavBar.jsx   ✅
@@ -147,6 +148,7 @@ frontend/src/
 | `projects.api.js` | getProjects, createProject, getProjectById, updateProject, deleteProject, getMembers, addMember, updateMemberRole, removeMember | ✅ | |
 | `tasks.api.js` | getProjectTasks, createTask, getTaskById, updateTask, deleteTask, createSubtask, updateSubtask, deleteSubtask | ✅ | |
 | `notes.api.js` | getProjectNotes, createNote, getNoteById, updateNote, deleteNote | ✅ | |
+| `comments.api.js` | getTaskComments, createComment, updateComment, deleteComment | ✅ | |
 
 ---
 
@@ -191,6 +193,7 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 | Drag-and-drop within column → reorder API call | ✅ | PATCH `/tasks/reorder` with `[{ taskId, order }]` |
 | Add Task button → inline form (Todo column) with priority + dueDate | ✅ | Priority select + date picker added; gated to `admin` + `project_admin` only |
 | Role-based UI — member management (Project Overview) | ✅ | Add member button (admin+project_admin); role-change select + remove button per row (admin only) |
+| Task drawer — Comments section | ✅ | Loads comments on drawer open; inline add (Ctrl+Enter or button); edit/delete own comments (pencil+trash icons); @mention displayed in content |
 
 ---
 
@@ -225,7 +228,8 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 13. ✅ Build Settings / Profile page (change password, sign out)
 14. ❌ (Future) Chat page — deferred to v2
 15. ❌ (Future) File attachments on tasks
-16. ❌ (Future) Add member to project from UI
+16. ✅ Add member to project from UI — invite form in Team panel (Project Overview), visible to admin+project_admin
 17. ❌ (Future) Task filters / search on board
 18. ✅ Dashboard KPIs — wired to real backend; 4-col KPI row (Open Tasks, In Progress, Overdue, Completed) aggregated across all user projects via `GET /projects/:id/dashboard`
 19. ✅ Notifications — bell polls every 30s, unread badge, `NotificationPanel` dropdown with mark-read; store: `notificationStore.js`; API: `notifications.api.js`
+20. ✅ Task Comments — per-task comment threads in drawer; `comments.api.js`; @mention support triggers backend notifications; owner/privileged edit+delete
