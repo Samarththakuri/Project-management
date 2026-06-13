@@ -250,6 +250,26 @@ const deleteSubtask = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Subtask deleted successfully"));
 });
 
+const getProjectCalendar = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const { from, to } = req.query;
+
+  const now = new Date();
+  const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const toDate = to ? new Date(to) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const tasks = await Task.find({
+    project: projectId,
+    dueDate: { $gte: fromDate, $lte: toDate },
+  })
+    .populate("assignee", POPULATE_USER)
+    .sort({ dueDate: 1 });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, tasks, "Calendar tasks fetched successfully"));
+});
+
 export {
   getProjectTasks,
   createTask,
@@ -260,4 +280,5 @@ export {
   createSubtask,
   updateSubtask,
   deleteSubtask,
+  getProjectCalendar,
 };

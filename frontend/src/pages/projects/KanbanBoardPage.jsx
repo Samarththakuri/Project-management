@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { KanbanCard, Badge, Avatar, Button, Input } from "../../components/ui";
+import BoardFilterBar from "../../components/ui/BoardFilterBar";
 import {
   getProjectTasks,
   createTask,
@@ -574,10 +575,12 @@ export default function KanbanBoardPage() {
   const { projectId } = useParams();
   const { user } = useAuthStore();
   const [tasks, setTasks] = useState([]);
+  const [members, setMembers] = useState([]);
   const [activeTask, setActiveTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [canAddTask, setCanAddTask] = useState(false);
+  const [filters, setFilters] = useState({ search: '', priority: '', assignee: '' });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -588,8 +591,9 @@ export default function KanbanBoardPage() {
     Promise.all([getProjectTasks(projectId), getMembers(projectId)])
       .then(([tRes, mRes]) => {
         setTasks(tRes.data.data || []);
-        const members = mRes.data.data || [];
-        const me = members.find((m) => m.user?._id === user?._id);
+        const fetchedMembers = mRes.data.data || [];
+        setMembers(fetchedMembers);
+        const me = fetchedMembers.find((m) => m.user?._id === user?._id);
         const role = me?.role;
         setCanAddTask(role === "admin" || role === "project_admin");
       })
@@ -601,7 +605,14 @@ export default function KanbanBoardPage() {
     load();
   }, [projectId]);
 
-  const byStatus = (status) => tasks.filter((t) => t.status === status);
+  const visibleTasks = tasks.filter((t) => {
+    if (filters.search && !t.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.priority && t.priority !== filters.priority) return false;
+    if (filters.assignee && t.assignee?._id !== filters.assignee) return false;
+    return true;
+  });
+
+  const byStatus = (status) => visibleTasks.filter((t) => t.status === status);
 
   async function handleAddTask(status, title, priority, dueDate) {
     try {
@@ -706,6 +717,9 @@ export default function KanbanBoardPage() {
           Task Board
         </h1>
       </div>
+
+      {/* Filter bar */}
+      <BoardFilterBar members={members} filters={filters} onChange={setFilters} />
 
       {/* Board */}
       <DndContext

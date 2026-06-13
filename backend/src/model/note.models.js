@@ -18,4 +18,5 @@ const projectNoteSchema = new Schema(
   },
   { timestamps: true },
 );
+projectNoteSchema.index({ content: "text" });
 export const Note = mongoose.model("Note", projectNoteSchema);

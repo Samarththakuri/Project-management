@@ -10,6 +10,12 @@ export const deleteTask = (projectId, taskId) =>
 export const reorderTasks = (projectId, tasks) =>
   api.patch(`/projects/${projectId}/tasks/reorder`, { tasks })
 
+export const getProjectCalendar = (projectId, from, to) =>
+  api.get(`/projects/${projectId}/tasks/calendar`, { params: { from, to } })
+
+export const searchProject = (projectId, params) =>
+  api.get(`/projects/${projectId}/search`, { params })
+
 export const createSubtask = (projectId, taskId, data) =>
   api.post(`/projects/${projectId}/tasks/${taskId}/subtasks`, data)
 export const updateSubtask = (projectId, taskId, subtaskId, data) =>

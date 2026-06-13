@@ -20,6 +20,7 @@ import {
   createSubtask,
   updateSubtask,
   deleteSubtask,
+  getProjectCalendar,
 } from "../controllers/task.controllers.js";
 
 const { ADMIN, PROJECT_ADMIN, MEMBER } = UserRolesEnum;
@@ -39,6 +40,10 @@ router
     validate(createTaskSchema),
     createTask,
   );
+
+router
+  .route("/:projectId/tasks/calendar")
+  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectCalendar);
 
 router
   .route("/:projectId/tasks/reorder")

@@ -17,6 +17,7 @@ export default function TopNavBar() {
     ? [
         { to: `/projects/${projectId}`, label: 'Overview', end: true },
         { to: `/projects/${projectId}/board`, label: 'Board', end: false },
+        { to: `/projects/${projectId}/calendar`, label: 'Calendar', end: false },
       ]
     : []
 

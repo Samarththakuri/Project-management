@@ -13,6 +13,7 @@ import DashboardPage from '../pages/dashboard/DashboardPage'
 import ProjectsPage from '../pages/projects/ProjectsPage'
 import ProjectOverviewPage from '../pages/projects/ProjectOverviewPage'
 import KanbanBoardPage from '../pages/projects/KanbanBoardPage'
+import CalendarView from '../pages/projects/CalendarView'
 import SettingsPage from '../pages/settings/SettingsPage'
 
 function ProtectedRoute({ children }) {
@@ -68,6 +69,7 @@ const router = createBrowserRouter([
       { path: '/projects', element: <ProjectsPage /> },
       { path: '/projects/:projectId', element: <ProjectOverviewPage /> },
       { path: '/projects/:projectId/board', element: <KanbanBoardPage /> },
+      { path: '/projects/:projectId/calendar', element: <CalendarView /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },

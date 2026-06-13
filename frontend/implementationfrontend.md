@@ -97,7 +97,8 @@ frontend/src/
 | Dashboard | `/dashboard` | ✅ | KPI cards (Active Issues, System Uptime), Recent Activity feed, Your Queue, Today's Schedule. Animated number counters on load. |
 | Projects List | `/projects` | ✅ | Grid of project cards with name, description, member count, progress bar. Empty state. |
 | Project Overview | `/projects/:projectId` | ✅ | Bento grid: Priority Tasks, Team, Task Stats. Project header with progress bar + team avatars. Team panel has role-based member management: add member (admin+project_admin), change role + remove member (admin only). |
-| Kanban Board | `/projects/:projectId/board` | ✅ | Three columns: Todo, In Progress, Done. Task cards with priority badge, ID, subtask count, assignee avatar. Right drawer for task detail. "Add Task" button gated to admin/project_admin. dnd-kit drag-and-drop. |
+| Kanban Board | `/projects/:projectId/board` | ✅ | Four columns: Todo, In Progress, In Review, Done. Filter bar (search, priority chips, assignee). Task cards with priority badge, ID, subtask count, assignee avatar. Right drawer for task detail. dnd-kit drag-and-drop. |
+| Calendar View | `/projects/:projectId/calendar` | ✅ | Monthly grid; tasks render as chips on their due date; color by priority; task detail popover on click; prev/next month navigation. |
 | Chat | `/projects/:projectId/chat` | ❌ | Future enhancement — skip for v1. |
 | Settings | `/settings` | ✅ | User profile, change password, sign out. |
 
@@ -118,7 +119,7 @@ frontend/src/
 ### TopNavBar
 | Item | Status | Notes |
 |---|---|---|
-| Horizontal sub-nav tabs (Overview / Board) | ✅ | Only shown when inside `/projects/:projectId/*`; active bottom border |
+| Horizontal sub-nav tabs (Overview / Board / Calendar) | ✅ | Only shown when inside `/projects/:projectId/*`; active bottom border |
 | Notifications bell | ✅ | Live — polls every 30s; red dot badge on unread; opens `NotificationPanel` dropdown |
 | Command palette shortcut button (⌘K) | ✅ | Static display |
 | User avatar | ✅ | Reads from Zustand authStore; initials fallback |
@@ -146,7 +147,7 @@ frontend/src/
 | Axios base | withCredentials, 401 → refresh → retry or redirect to login | ✅ | Queue-based refresh to avoid parallel refresh calls |
 | `auth.api.js` | register, login, logout, currentUser, verifyEmail, forgotPassword, resetPassword, changePassword, refreshToken | ✅ | |
 | `projects.api.js` | getProjects, createProject, getProjectById, updateProject, deleteProject, getMembers, addMember, updateMemberRole, removeMember | ✅ | |
-| `tasks.api.js` | getProjectTasks, createTask, getTaskById, updateTask, deleteTask, createSubtask, updateSubtask, deleteSubtask | ✅ | |
+| `tasks.api.js` | getProjectTasks, createTask, getTaskById, updateTask, deleteTask, reorderTasks, createSubtask, updateSubtask, deleteSubtask, getProjectCalendar, searchProject | ✅ | |
 | `notes.api.js` | getProjectNotes, createNote, getNoteById, updateNote, deleteNote | ✅ | |
 | `comments.api.js` | getTaskComments, createComment, updateComment, deleteComment | ✅ | |
 
@@ -229,7 +230,8 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 14. ❌ (Future) Chat page — deferred to v2
 15. ❌ (Future) File attachments on tasks
 16. ✅ Add member to project from UI — invite form in Team panel (Project Overview), visible to admin+project_admin
-17. ❌ (Future) Task filters / search on board
+17. ✅ Task filters / search on board — `BoardFilterBar` component: debounced title search, priority chip filters, assignee dropdown; client-side filtering of task list
 18. ✅ Dashboard KPIs — wired to real backend; 4-col KPI row (Open Tasks, In Progress, Overdue, Completed) aggregated across all user projects via `GET /projects/:id/dashboard`
 19. ✅ Notifications — bell polls every 30s, unread badge, `NotificationPanel` dropdown with mark-read; store: `notificationStore.js`; API: `notifications.api.js`
 20. ✅ Task Comments — per-task comment threads in drawer; `comments.api.js`; @mention support triggers backend notifications; owner/privileged edit+delete
+21. ✅ Calendar View — `CalendarView.jsx`; monthly grid; task chips by due date colored by priority; task detail popover; prev/next navigation; "Calendar" tab in TopNavBar sub-nav
