@@ -43,7 +43,11 @@ router
 
 router
   .route("/:projectId/tasks/calendar")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectCalendar);
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectCalendar,
+  );
 
 router
   .route("/:projectId/tasks/reorder")

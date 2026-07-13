@@ -10,7 +10,9 @@ const getNotifications = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, notifications, "Notifications fetched successfully"));
+    .json(
+      new ApiResponse(200, notifications, "Notifications fetched successfully"),
+    );
 });
 
 const markAsRead = asyncHandler(async (req, res) => {

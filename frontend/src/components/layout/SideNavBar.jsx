@@ -4,14 +4,10 @@ import { Button } from '../ui'
 const NAV_LINKS = [
   { to: '/dashboard', icon: 'grid_view', label: 'Dashboard' },
   { to: '/projects', icon: 'folder', label: 'Projects' },
-  { to: '/team', icon: 'group', label: 'Team' },
-  { to: '/calendar', icon: 'calendar_today', label: 'Calendar' },
-  { to: '/reports', icon: 'bar_chart', label: 'Reports' },
 ]
 
 const FOOTER_LINKS = [
   { to: '/settings', icon: 'settings', label: 'Settings' },
-  { to: '/help', icon: 'help', label: 'Help' },
 ]
 
 const base = 'flex items-center gap-3 px-4 py-2.5 text-body-md font-geist transition-colors duration-150 border-r-2'

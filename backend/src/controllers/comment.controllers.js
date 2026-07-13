@@ -4,15 +4,23 @@ import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { ActivityActionEnum, NotificationTypeEnum, UserRolesEnum } from "../utils/constants.js";
+import {
+  ActivityActionEnum,
+  NotificationTypeEnum,
+  UserRolesEnum,
+} from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
 import { sendNotification } from "../utils/notification.js";
 
 async function resolveMentions(content, senderId, projectId) {
-  const handles = [...new Set(content.match(/@(\w+)/g) ?? [])].map((h) => h.slice(1));
+  const handles = [...new Set(content.match(/@(\w+)/g) ?? [])].map((h) =>
+    h.slice(1),
+  );
   if (!handles.length) return [];
 
-  const users = await User.find({ username: { $in: handles } }).select("_id username");
+  const users = await User.find({ username: { $in: handles } }).select(
+    "_id username",
+  );
 
   for (const user of users) {
     sendNotification(
@@ -34,7 +42,9 @@ const getTaskComments = asyncHandler(async (req, res) => {
     .populate("createdBy", "username fullName email avatar")
     .sort({ createdAt: 1 });
 
-  return res.status(200).json(new ApiResponse(200, comments, "Comments fetched successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, comments, "Comments fetched successfully"));
 });
 
 const createComment = asyncHandler(async (req, res) => {
@@ -44,7 +54,11 @@ const createComment = asyncHandler(async (req, res) => {
   const task = await Task.findOne({ _id: taskId, project: projectId });
   if (!task) throw new ApiError(404, "Task not found");
 
-  const mentionedUsers = await resolveMentions(content, req.user._id, projectId);
+  const mentionedUsers = await resolveMentions(
+    content,
+    req.user._id,
+    projectId,
+  );
 
   const comment = await Comment.create({
     task: taskId,
@@ -55,9 +69,18 @@ const createComment = asyncHandler(async (req, res) => {
 
   await comment.populate("createdBy", "username fullName email avatar");
 
-  logActivity(req.user._id, ActivityActionEnum.COMMENT_CREATED, projectId, "comment", comment._id, { taskId });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.COMMENT_CREATED,
+    projectId,
+    "comment",
+    comment._id,
+    { taskId },
+  );
 
-  return res.status(201).json(new ApiResponse(201, comment, "Comment created successfully"));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, comment, "Comment created successfully"));
 });
 
 const updateComment = asyncHandler(async (req, res) => {
@@ -68,7 +91,10 @@ const updateComment = asyncHandler(async (req, res) => {
   if (!comment) throw new ApiError(404, "Comment not found");
 
   const isOwner = String(comment.createdBy) === String(req.user._id);
-  const isPrivileged = [UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN].includes(req.projectMember?.role);
+  const isPrivileged = [
+    UserRolesEnum.ADMIN,
+    UserRolesEnum.PROJECT_ADMIN,
+  ].includes(req.projectMember?.role);
 
   if (!isOwner && !isPrivileged) {
     throw new ApiError(403, "You can only edit your own comments");
@@ -79,9 +105,18 @@ const updateComment = asyncHandler(async (req, res) => {
   await comment.save();
   await comment.populate("createdBy", "username fullName email avatar");
 
-  logActivity(req.user._id, ActivityActionEnum.COMMENT_UPDATED, projectId, "comment", comment._id, { taskId });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.COMMENT_UPDATED,
+    projectId,
+    "comment",
+    comment._id,
+    { taskId },
+  );
 
-  return res.status(200).json(new ApiResponse(200, comment, "Comment updated successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, comment, "Comment updated successfully"));
 });
 
 const deleteComment = asyncHandler(async (req, res) => {
@@ -91,7 +126,10 @@ const deleteComment = asyncHandler(async (req, res) => {
   if (!comment) throw new ApiError(404, "Comment not found");
 
   const isOwner = String(comment.createdBy) === String(req.user._id);
-  const isPrivileged = [UserRolesEnum.ADMIN, UserRolesEnum.PROJECT_ADMIN].includes(req.projectMember?.role);
+  const isPrivileged = [
+    UserRolesEnum.ADMIN,
+    UserRolesEnum.PROJECT_ADMIN,
+  ].includes(req.projectMember?.role);
 
   if (!isOwner && !isPrivileged) {
     throw new ApiError(403, "You can only delete your own comments");
@@ -99,9 +137,18 @@ const deleteComment = asyncHandler(async (req, res) => {
 
   await Comment.findByIdAndDelete(commentId);
 
-  logActivity(req.user._id, ActivityActionEnum.COMMENT_DELETED, projectId, "comment", commentId, { taskId });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.COMMENT_DELETED,
+    projectId,
+    "comment",
+    commentId,
+    { taskId },
+  );
 
-  return res.status(200).json(new ApiResponse(200, {}, "Comment deleted successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Comment deleted successfully"));
 });
 
 export { getTaskComments, createComment, updateComment, deleteComment };

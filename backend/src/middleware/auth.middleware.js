@@ -42,7 +42,10 @@ export const verifyProjectRole = (...roles) =>
       throw new ApiError(403, "You are not a member of this project");
     }
     if (!roles.includes(member.role)) {
-      throw new ApiError(403, "You do not have permission to perform this action");
+      throw new ApiError(
+        403,
+        "You do not have permission to perform this action",
+      );
     }
     req.projectMember = member;
     next();

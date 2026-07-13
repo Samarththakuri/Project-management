@@ -4,7 +4,10 @@ import { ProjectMember } from "../model/projectmember.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { ActivityActionEnum, NotificationTypeEnum } from "../utils/constants.js";
+import {
+  ActivityActionEnum,
+  NotificationTypeEnum,
+} from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
 import { sendNotification } from "../utils/notification.js";
 
@@ -27,14 +30,20 @@ const createTask = asyncHandler(async (req, res) => {
   const { title, description, assignee, status, priority, dueDate } = req.body;
 
   if (assignee) {
-    const isMember = await ProjectMember.findOne({ project: projectId, user: assignee });
+    const isMember = await ProjectMember.findOne({
+      project: projectId,
+      user: assignee,
+    });
     if (!isMember) {
       throw new ApiError(400, "Assigned user is not a member of this project");
     }
   }
 
   const taskStatus = status || "todo";
-  const order = await Task.countDocuments({ project: projectId, status: taskStatus });
+  const order = await Task.countDocuments({
+    project: projectId,
+    status: taskStatus,
+  });
 
   const attachments = (req.files || []).map((file) => ({
     url: `/uploads/tasks/${file.filename}`,
@@ -51,11 +60,19 @@ const createTask = asyncHandler(async (req, res) => {
     status: taskStatus,
     priority,
     dueDate: dueDate || null,
+    completedAt: taskStatus === "done" ? new Date() : null,
     order,
     attachments,
   });
 
-  logActivity(req.user._id, ActivityActionEnum.TASK_CREATED, projectId, "task", task._id, { title: task.title });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.TASK_CREATED,
+    projectId,
+    "task",
+    task._id,
+    { title: task.title },
+  );
 
   if (assignee) {
     sendNotification(
@@ -90,7 +107,9 @@ const getTaskById = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { task, subtasks }, "Task fetched successfully"));
+    .json(
+      new ApiResponse(200, { task, subtasks }, "Task fetched successfully"),
+    );
 });
 
 const updateTask = asyncHandler(async (req, res) => {
@@ -98,13 +117,19 @@ const updateTask = asyncHandler(async (req, res) => {
   const { title, description, assignee, status, priority, dueDate } = req.body;
 
   if (assignee !== undefined) {
-    const isMember = await ProjectMember.findOne({ project: projectId, user: assignee });
+    const isMember = await ProjectMember.findOne({
+      project: projectId,
+      user: assignee,
+    });
     if (!isMember) {
       throw new ApiError(400, "Assigned user is not a member of this project");
     }
   }
 
-  const existingTask = await Task.findOne({ _id: taskId, project: projectId }).select("assignee");
+  const existingTask = await Task.findOne({
+    _id: taskId,
+    project: projectId,
+  }).select("assignee status");
 
   const updateFields = {};
   if (title !== undefined) updateFields.title = title;
@@ -113,6 +138,15 @@ const updateTask = asyncHandler(async (req, res) => {
   if (status !== undefined) updateFields.status = status;
   if (priority !== undefined) updateFields.priority = priority;
   if (dueDate !== undefined) updateFields.dueDate = dueDate || null;
+
+  // Maintain completedAt on status transitions in/out of "done"
+  if (status !== undefined && status !== existingTask?.status) {
+    if (status === "done") {
+      updateFields.completedAt = new Date();
+    } else if (existingTask?.status === "done") {
+      updateFields.completedAt = null;
+    }
+  }
 
   const task = await Task.findOneAndUpdate(
     { _id: taskId, project: projectId },
@@ -124,9 +158,19 @@ const updateTask = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Task not found");
   }
 
-  logActivity(req.user._id, ActivityActionEnum.TASK_UPDATED, projectId, "task", task._id, { title: task.title });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.TASK_UPDATED,
+    projectId,
+    "task",
+    task._id,
+    { title: task.title },
+  );
 
-  if (assignee !== undefined && String(assignee) !== String(existingTask?.assignee)) {
+  if (
+    assignee !== undefined &&
+    String(assignee) !== String(existingTask?.assignee)
+  ) {
     sendNotification(
       assignee,
       req.user._id,
@@ -152,7 +196,14 @@ const deleteTask = asyncHandler(async (req, res) => {
 
   await Subtask.deleteMany({ task: taskId });
 
-  logActivity(req.user._id, ActivityActionEnum.TASK_DELETED, projectId, "task", taskId, { title: task.title });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.TASK_DELETED,
+    projectId,
+    "task",
+    taskId,
+    { title: task.title },
+  );
 
   return res
     .status(200)
@@ -192,7 +243,14 @@ const createSubtask = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
-  logActivity(req.user._id, ActivityActionEnum.SUBTASK_CREATED, projectId, "subtask", subtask._id, { title: subtask.title });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.SUBTASK_CREATED,
+    projectId,
+    "subtask",
+    subtask._id,
+    { title: subtask.title },
+  );
 
   return res
     .status(201)
@@ -223,7 +281,14 @@ const updateSubtask = asyncHandler(async (req, res) => {
   );
 
   if (isCompleted !== undefined) {
-    logActivity(req.user._id, ActivityActionEnum.SUBTASK_COMPLETED, projectId, "subtask", updated._id, { isCompleted: updated.isCompleted });
+    logActivity(
+      req.user._id,
+      ActivityActionEnum.SUBTASK_COMPLETED,
+      projectId,
+      "subtask",
+      updated._id,
+      { isCompleted: updated.isCompleted },
+    );
   }
 
   return res
@@ -255,8 +320,12 @@ const getProjectCalendar = asyncHandler(async (req, res) => {
   const { from, to } = req.query;
 
   const now = new Date();
-  const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
-  const toDate = to ? new Date(to) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const fromDate = from
+    ? new Date(from)
+    : new Date(now.getFullYear(), now.getMonth(), 1);
+  const toDate = to
+    ? new Date(to)
+    : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   const tasks = await Task.find({
     project: projectId,

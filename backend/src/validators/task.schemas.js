@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { AvialableTasksStatus, AvialableTaskPriority } from "../utils/constants.js";
+import {
+  AvialableTasksStatus,
+  AvialableTaskPriority,
+} from "../utils/constants.js";
 
 const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ID");
 
@@ -8,12 +11,16 @@ export const createTaskSchema = z.object({
   description: z.string().trim().optional(),
   assignee: objectIdSchema.optional(),
   status: z
-    .enum(AvialableTasksStatus, { errorMap: () => ({ message: "Invalid status" }) })
+    .enum(AvialableTasksStatus, {
+      errorMap: () => ({ message: "Invalid status" }),
+    })
     .optional(),
   priority: z
-    .enum(AvialableTaskPriority, { errorMap: () => ({ message: "Invalid priority" }) })
+    .enum(AvialableTaskPriority, {
+      errorMap: () => ({ message: "Invalid priority" }),
+    })
     .optional(),
-  dueDate: z.string().datetime({ offset: true }).optional().nullable(),
+  dueDate: z.coerce.date().optional().nullable(),
 });
 
 export const updateTaskSchema = z
@@ -22,17 +29,20 @@ export const updateTaskSchema = z
     description: z.string().trim().optional(),
     assignee: objectIdSchema.optional(),
     status: z
-      .enum(AvialableTasksStatus, { errorMap: () => ({ message: "Invalid status" }) })
+      .enum(AvialableTasksStatus, {
+        errorMap: () => ({ message: "Invalid status" }),
+      })
       .optional(),
     priority: z
-      .enum(AvialableTaskPriority, { errorMap: () => ({ message: "Invalid priority" }) })
+      .enum(AvialableTaskPriority, {
+        errorMap: () => ({ message: "Invalid priority" }),
+      })
       .optional(),
-    dueDate: z.string().datetime({ offset: true }).optional().nullable(),
+    dueDate: z.coerce.date().optional().nullable(),
   })
-  .refine(
-    (data) => Object.values(data).some((v) => v !== undefined),
-    { message: "At least one field must be provided" },
-  );
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
+    message: "At least one field must be provided",
+  });
 
 export const reorderTasksSchema = z.object({
   tasks: z

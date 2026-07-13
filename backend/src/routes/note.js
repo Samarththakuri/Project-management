@@ -19,7 +19,11 @@ const router = Router();
 
 router
   .route("/:projectId/notes")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectNotes)
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectNotes,
+  )
   .post(
     verifyJWT,
     verifyProjectRole(ADMIN, PROJECT_ADMIN),

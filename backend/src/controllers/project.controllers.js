@@ -7,7 +7,11 @@ import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { UserRolesEnum, ActivityActionEnum, NotificationTypeEnum } from "../utils/constants.js";
+import {
+  UserRolesEnum,
+  ActivityActionEnum,
+  NotificationTypeEnum,
+} from "../utils/constants.js";
 import { logActivity } from "../utils/activity.js";
 import { sendNotification } from "../utils/notification.js";
 
@@ -60,7 +64,14 @@ const createProject = asyncHandler(async (req, res) => {
     role: UserRolesEnum.ADMIN,
   });
 
-  logActivity(req.user._id, ActivityActionEnum.PROJECT_CREATED, project._id, "project", project._id, { name: project.name });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.PROJECT_CREATED,
+    project._id,
+    "project",
+    project._id,
+    { name: project.name },
+  );
 
   return res
     .status(201)
@@ -92,7 +103,14 @@ const updateProject = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  logActivity(req.user._id, ActivityActionEnum.PROJECT_UPDATED, project._id, "project", project._id, { name: project.name });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.PROJECT_UPDATED,
+    project._id,
+    "project",
+    project._id,
+    { name: project.name },
+  );
 
   return res
     .status(200)
@@ -118,7 +136,14 @@ const deleteProject = asyncHandler(async (req, res) => {
     Note.deleteMany({ project: projectId }),
   ]);
 
-  logActivity(req.user._id, ActivityActionEnum.PROJECT_DELETED, projectId, "project", projectId, { name: project.name });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.PROJECT_DELETED,
+    projectId,
+    "project",
+    projectId,
+    { name: project.name },
+  );
 
   return res
     .status(200)
@@ -135,7 +160,9 @@ const getProjectMembers = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, members, "Project members fetched successfully"));
+    .json(
+      new ApiResponse(200, members, "Project members fetched successfully"),
+    );
 });
 
 const addProjectMember = asyncHandler(async (req, res) => {
@@ -158,7 +185,7 @@ const addProjectMember = asyncHandler(async (req, res) => {
   const member = await ProjectMember.create({
     user: user._id,
     project: projectId,
-    role:role||UserRolesEnum.MEMBER,
+    role: role || UserRolesEnum.MEMBER,
   });
 
   await member.populate(
@@ -166,7 +193,14 @@ const addProjectMember = asyncHandler(async (req, res) => {
     "-password -refreshToken -emailVerificationToken -emailVerificationExpiry -forgotPasswordToken -forgotPasswordExpiry",
   );
 
-  logActivity(req.user._id, ActivityActionEnum.MEMBER_ADDED, projectId, "member", user._id, { email: user.email, role });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.MEMBER_ADDED,
+    projectId,
+    "member",
+    user._id,
+    { email: user.email, role },
+  );
 
   const project = await Project.findById(projectId).select("name");
   if (project) {
@@ -198,7 +232,14 @@ const updateMemberRole = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Member not found in this project");
   }
 
-  logActivity(req.user._id, ActivityActionEnum.MEMBER_ROLE_CHANGED, projectId, "member", member.user, { role });
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.MEMBER_ROLE_CHANGED,
+    projectId,
+    "member",
+    member.user,
+    { role },
+  );
 
   const project = await Project.findById(projectId).select("name");
   if (project) {
@@ -228,7 +269,13 @@ const removeProjectMember = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Member not found in this project");
   }
 
-  logActivity(req.user._id, ActivityActionEnum.MEMBER_REMOVED, projectId, "member", member.user);
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.MEMBER_REMOVED,
+    projectId,
+    "member",
+    member.user,
+  );
 
   return res
     .status(200)

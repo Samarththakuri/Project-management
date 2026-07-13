@@ -27,7 +27,13 @@ const createNote = asyncHandler(async (req, res) => {
     content,
   });
 
-  logActivity(req.user._id, ActivityActionEnum.NOTE_CREATED, projectId, "note", note._id);
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.NOTE_CREATED,
+    projectId,
+    "note",
+    note._id,
+  );
 
   return res
     .status(201)
@@ -64,7 +70,13 @@ const updateNote = asyncHandler(async (req, res) => {
   note.content = content;
   await note.save();
 
-  logActivity(req.user._id, ActivityActionEnum.NOTE_UPDATED, projectId, "note", note._id);
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.NOTE_UPDATED,
+    projectId,
+    "note",
+    note._id,
+  );
 
   return res
     .status(200)
@@ -82,7 +94,13 @@ const deleteNote = asyncHandler(async (req, res) => {
 
   await Note.findByIdAndDelete(noteId);
 
-  logActivity(req.user._id, ActivityActionEnum.NOTE_DELETED, projectId, "note", note._id);
+  logActivity(
+    req.user._id,
+    ActivityActionEnum.NOTE_DELETED,
+    projectId,
+    "note",
+    note._id,
+  );
 
   return res
     .status(200)

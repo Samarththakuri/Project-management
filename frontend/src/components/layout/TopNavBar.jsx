@@ -6,7 +6,7 @@ import useAuthStore from '../../store/authStore'
 import useNotificationStore from '../../store/notificationStore'
 import { getNotifications } from '../../api/notifications.api'
 
-export default function TopNavBar() {
+export default function TopNavBar({ onOpenSearch }) {
   const user = useAuthStore((s) => s.user)
   const { setNotifications, unreadCount } = useNotificationStore()
   const [isOpen, setIsOpen] = useState(false)
@@ -56,11 +56,15 @@ export default function TopNavBar() {
 
       {/* Right: controls */}
       <div className="flex items-center gap-3 ml-auto">
-        {/* Cmd+K pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 border border-outline-variant text-on-surface-variant cursor-default select-none">
+        {/* Cmd+K command palette trigger */}
+        <button
+          onClick={onOpenSearch}
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 border border-outline-variant text-on-surface-variant hover:border-primary-fixed-dim hover:text-on-surface transition-colors select-none"
+          aria-label="Open command palette"
+        >
           <span className="material-symbols-outlined text-[15px] select-none leading-none">search</span>
           <span className="text-mono-label font-mono">⌘K</span>
-        </div>
+        </button>
 
         {/* Notifications */}
         <div className="relative">

@@ -58,7 +58,11 @@ router
 
 router
   .route("/:projectId/dashboard")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), getProjectDashboard);
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    getProjectDashboard,
+  );
 
 router
   .route("/:projectId/members/:userId")

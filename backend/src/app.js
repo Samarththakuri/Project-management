@@ -11,6 +11,8 @@ import activityRouter from "./routes/activity.js";
 import notificationRouter from "./routes/notification.js";
 import commentRouter from "./routes/comment.js";
 import searchRouter from "./routes/search.js";
+import globalSearchRouter from "./routes/globalsearch.js";
+import dashboardRouter from "./routes/dashboard.js";
 import { requestLogger } from "./middleware/logger.js";
 const app = express();
 // basic configurations middleware hai
@@ -43,6 +45,8 @@ app.use("/api/v1/projects", activityRouter);
 app.use("/api/v1", notificationRouter);
 app.use("/api/v1/projects", commentRouter);
 app.use("/api/v1/projects", searchRouter);
+app.use("/api/v1/search", globalSearchRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
 
 app.get("/", (req, res) => {
   res.send("Welcome to basecampy");

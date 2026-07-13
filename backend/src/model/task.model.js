@@ -40,6 +40,10 @@ const taskSchema = new Schema(
       type: Date,
       default: null,
     },
+    completedAt: {
+      type: Date,
+      default: null,
+    },
     order: {
       type: Number,
       default: 0,
@@ -58,4 +62,8 @@ const taskSchema = new Schema(
   { timestamps: true },
 );
 taskSchema.index({ title: "text", description: "text" });
+taskSchema.index({ project: 1, status: 1 });
+taskSchema.index({ assignee: 1, status: 1 });
+taskSchema.index({ project: 1, dueDate: 1 });
+taskSchema.index({ dueDate: 1, status: 1 });
 export const Task = mongoose.model("Task", taskSchema);

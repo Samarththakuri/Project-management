@@ -8,6 +8,10 @@ const router = Router();
 
 router
   .route("/:projectId/search")
-  .get(verifyJWT, verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER), searchProject);
+  .get(
+    verifyJWT,
+    verifyProjectRole(ADMIN, PROJECT_ADMIN, MEMBER),
+    searchProject,
+  );
 
 export default router;

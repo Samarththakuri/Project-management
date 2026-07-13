@@ -23,6 +23,7 @@ import { KanbanCard, Badge, Avatar, Button, Input } from "../../components/ui";
 import BoardFilterBar from "../../components/ui/BoardFilterBar";
 import {
   getProjectTasks,
+  getTaskById,
   createTask,
   updateTask,
   updateSubtask,
@@ -74,7 +75,15 @@ function SortableCard({ task, onClick }) {
 }
 
 /* ---- Column ---- */
-function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
+function Column({
+  column,
+  tasks,
+  onCardClick,
+  onAddTask,
+  canAddTask,
+  members,
+  currentUserId,
+}) {
   const [adding, setAdding] = useState(false);
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -90,8 +99,10 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
         title: z.string().min(1),
         priority: z.string().optional(),
         dueDate: z.string().optional(),
+        assignee: z.string().optional(),
       }),
     ),
+    defaultValues: { priority: "medium", assignee: currentUserId ?? "" },
   });
 
   async function submit(data) {
@@ -100,6 +111,7 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
       data.title,
       data.priority || "medium",
       data.dueDate || null,
+      data.assignee || currentUserId || null,
     );
     reset();
     setAdding(false);
@@ -156,6 +168,20 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
                   </option>
                 ))}
               </select>
+              <select
+                className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
+                {...register("assignee")}
+              >
+                {members.map((m) => (
+                  <option
+                    key={m.user?._id}
+                    value={m.user?._id}
+                    className="bg-surface-container"
+                  >
+                    {m.user?.fullName || m.user?.username}
+                  </option>
+                ))}
+              </select>
               <input
                 type="date"
                 className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface px-2 py-1 focus:outline-none"
@@ -198,18 +224,30 @@ function Column({ column, tasks, onCardClick, onAddTask, canAddTask }) {
 }
 
 /* ---- Task Detail Drawer ---- */
-function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged }) {
+function TaskDrawer({
+  task,
+  onClose,
+  onUpdate,
+  onDelete,
+  projectId,
+  isPrivileged,
+}) {
   const { user } = useAuthStore();
-  const [subtasks, setSubtasks] = useState(task?.subTasks || []);
+  const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
-
   useEffect(() => {
-    setSubtasks(task?.subTasks || []);
-  }, [task]);
+    if (!task?._id) return;
+
+    getTaskById(projectId, task._id)
+      .then((res) => {
+        setSubtasks(res.data.data.subtasks || []);
+      })
+      .catch(console.error);
+  }, [task, projectId]);
 
   useEffect(() => {
     if (!task?._id) return;
@@ -240,7 +278,8 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
       const res = await createComment(projectId, task._id, { content });
       setComments((prev) => [...prev, res.data.data]);
       setCommentInput("");
-    } catch {} finally {
+    } catch {
+    } finally {
       setSubmittingComment(false);
     }
   }
@@ -249,7 +288,9 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
     const content = editContent.trim();
     if (!content) return;
     try {
-      const res = await updateComment(projectId, task._id, commentId, { content });
+      const res = await updateComment(projectId, task._id, commentId, {
+        content,
+      });
       setComments((prev) =>
         prev.map((c) => (c._id === commentId ? res.data.data : c)),
       );
@@ -440,7 +481,9 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
                 const isOwn = comment.createdBy?._id === user?._id;
                 const canModify = isOwn || isPrivileged;
                 const commenterAvatar =
-                  comment.createdBy?.avatar?.url ?? comment.createdBy?.avatar ?? null;
+                  comment.createdBy?.avatar?.url ??
+                  comment.createdBy?.avatar ??
+                  null;
 
                 return (
                   <div
@@ -459,10 +502,13 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
                             {comment.createdBy?.username}
                           </span>
                           <span className="text-mono-label font-mono text-on-surface-variant opacity-60 flex-shrink-0">
-                            {new Date(comment.createdAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {new Date(comment.createdAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
                           </span>
                         </div>
 
@@ -473,8 +519,12 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
                               value={editContent}
                               onChange={(e) => setEditContent(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.ctrlKey && e.key === "Enter") handleEditComment(comment._id);
-                                if (e.key === "Escape") { setEditingId(null); setEditContent(""); }
+                                if (e.ctrlKey && e.key === "Enter")
+                                  handleEditComment(comment._id);
+                                if (e.key === "Escape") {
+                                  setEditingId(null);
+                                  setEditContent("");
+                                }
                               }}
                               rows={2}
                               className="w-full bg-surface-container-high border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary resize-none"
@@ -487,7 +537,10 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
                                 Save
                               </button>
                               <button
-                                onClick={() => { setEditingId(null); setEditContent(""); }}
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setEditContent("");
+                                }}
                                 className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest hover:opacity-80"
                               >
                                 Cancel
@@ -504,16 +557,23 @@ function TaskDrawer({ task, onClose, onUpdate, onDelete, projectId, isPrivileged
                       {canModify && editingId !== comment._id && (
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <button
-                            onClick={() => { setEditingId(comment._id); setEditContent(comment.content); }}
+                            onClick={() => {
+                              setEditingId(comment._id);
+                              setEditContent(comment.content);
+                            }}
                             className="text-on-surface-variant hover:text-on-surface transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[16px] select-none">edit</span>
+                            <span className="material-symbols-outlined text-[16px] select-none">
+                              edit
+                            </span>
                           </button>
                           <button
                             onClick={() => handleDeleteComment(comment._id)}
                             className="text-on-surface-variant hover:text-error transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[16px] select-none">delete</span>
+                            <span className="material-symbols-outlined text-[16px] select-none">
+                              delete
+                            </span>
                           </button>
                         </div>
                       )}
@@ -580,7 +640,11 @@ export default function KanbanBoardPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [canAddTask, setCanAddTask] = useState(false);
-  const [filters, setFilters] = useState({ search: '', priority: '', assignee: '' });
+  const [filters, setFilters] = useState({
+    search: "",
+    priority: "",
+    assignee: "",
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -606,7 +670,11 @@ export default function KanbanBoardPage() {
   }, [projectId]);
 
   const visibleTasks = tasks.filter((t) => {
-    if (filters.search && !t.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (
+      filters.search &&
+      !t.title.toLowerCase().includes(filters.search.toLowerCase())
+    )
+      return false;
     if (filters.priority && t.priority !== filters.priority) return false;
     if (filters.assignee && t.assignee?._id !== filters.assignee) return false;
     return true;
@@ -614,13 +682,16 @@ export default function KanbanBoardPage() {
 
   const byStatus = (status) => visibleTasks.filter((t) => t.status === status);
 
-  async function handleAddTask(status, title, priority, dueDate) {
+  async function handleAddTask(status, title, priority, dueDate, assignee) {
     try {
       const payload = { title, status, priority };
       if (dueDate) payload.dueDate = new Date(dueDate).toISOString();
+      if (assignee) payload.assignee = assignee;
       const res = await createTask(projectId, payload);
       setTasks((prev) => [...prev, res.data.data]);
-    } catch {}
+    } catch (error) {
+      console.error("Failed to create task:", error);
+    }
   }
 
   function handleDragStart(event) {
@@ -719,7 +790,11 @@ export default function KanbanBoardPage() {
       </div>
 
       {/* Filter bar */}
-      <BoardFilterBar members={members} filters={filters} onChange={setFilters} />
+      <BoardFilterBar
+        members={members}
+        filters={filters}
+        onChange={setFilters}
+      />
 
       {/* Board */}
       <DndContext
@@ -737,6 +812,8 @@ export default function KanbanBoardPage() {
               onCardClick={setSelectedTask}
               onAddTask={handleAddTask}
               canAddTask={canAddTask}
+              members={members}
+              currentUserId={user?._id}
             />
           ))}
         </div>

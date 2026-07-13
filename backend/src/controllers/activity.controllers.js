@@ -17,9 +17,15 @@ const getProjectActivity = asyncHandler(async (req, res) => {
     Activity.countDocuments({ project: projectId }),
   ]);
 
-  return res.status(200).json(
-    new ApiResponse(200, { activities, total, page, limit }, "Activity fetched successfully"),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { activities, total, page, limit },
+        "Activity fetched successfully",
+      ),
+    );
 });
 
 export { getProjectActivity };
