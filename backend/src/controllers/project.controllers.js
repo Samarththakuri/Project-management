@@ -1,8 +1,6 @@
 import { Project } from "../model/project.models.js";
 import { ProjectMember } from "../model/projectmember.models.js";
 import { Task } from "../model/task.model.js";
-import { Subtask } from "../model/subtask.models.js";
-import { Note } from "../model/note.models.js";
 import { User } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
@@ -126,14 +124,9 @@ const deleteProject = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Project not found");
   }
 
-  const projectTasks = await Task.find({ project: projectId }).select("_id");
-  const taskIds = projectTasks.map((t) => t._id);
-
   await Promise.all([
     ProjectMember.deleteMany({ project: projectId }),
     Task.deleteMany({ project: projectId }),
-    Subtask.deleteMany({ task: { $in: taskIds } }),
-    Note.deleteMany({ project: projectId }),
   ]);
 
   logActivity(

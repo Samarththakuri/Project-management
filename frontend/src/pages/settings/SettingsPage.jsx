@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, Input, Avatar } from '../../components/ui'
 import useAuthStore from '../../store/authStore'
-import { changePassword } from '../../api/auth.api'
+import { changePassword, resendVerification } from '../../api/auth.api'
 import { logout } from '../../api/auth.api'
 import { useNavigate } from 'react-router-dom'
 
@@ -25,6 +25,9 @@ export default function SettingsPage() {
   const navigate = useNavigate()
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+  const [resendError, setResendError] = useState('')
 
   const {
     register,
@@ -42,6 +45,20 @@ export default function SettingsPage() {
       reset()
     } catch (err) {
       setPasswordError(err.response?.data?.message || 'Failed to update password')
+    }
+  }
+
+  async function handleResendVerification() {
+    setResending(true)
+    setResendMsg('')
+    setResendError('')
+    try {
+      await resendVerification()
+      setResendMsg('Verification email sent. Check your inbox.')
+    } catch (err) {
+      setResendError(err.response?.data?.message || 'Failed to send verification email')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -86,14 +103,31 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="px-6 pb-6">
-          <div className="flex items-center gap-3 text-body-md font-geist">
-            <span
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${user?.isEmailVerified ? 'bg-primary-fixed-dim' : 'bg-error'}`}
-            />
-            <span className="text-on-surface-variant">
-              Email {user?.isEmailVerified ? 'verified' : 'not verified'}
-            </span>
+          <div className="flex items-center justify-between gap-3 text-body-md font-geist">
+            <div className="flex items-center gap-3">
+              <span
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${user?.isEmailVerified ? 'bg-primary-fixed-dim' : 'bg-error'}`}
+              />
+              <span className="text-on-surface-variant">
+                Email {user?.isEmailVerified ? 'verified' : 'not verified'}
+              </span>
+            </div>
+            {!user?.isEmailVerified && (
+              <Button
+                variant="secondary"
+                onClick={handleResendVerification}
+                disabled={resending}
+              >
+                {resending ? 'Sending…' : 'Resend verification email'}
+              </Button>
+            )}
           </div>
+          {resendMsg && (
+            <p className="mt-3 text-body-md font-geist text-primary-fixed-dim">{resendMsg}</p>
+          )}
+          {resendError && (
+            <p className="mt-3 text-body-md font-geist text-error">{resendError}</p>
+          )}
         </div>
       </section>
 

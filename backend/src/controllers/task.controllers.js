@@ -1,5 +1,4 @@
 import { Task } from "../model/task.model.js";
-import { Subtask } from "../model/subtask.models.js";
 import { ProjectMember } from "../model/projectmember.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
@@ -45,12 +44,6 @@ const createTask = asyncHandler(async (req, res) => {
     status: taskStatus,
   });
 
-  const attachments = (req.files || []).map((file) => ({
-    url: `/uploads/tasks/${file.filename}`,
-    mimetype: file.mimetype,
-    size: file.size,
-  }));
-
   const task = await Task.create({
     title,
     description,
@@ -62,7 +55,6 @@ const createTask = asyncHandler(async (req, res) => {
     dueDate: dueDate || null,
     completedAt: taskStatus === "done" ? new Date() : null,
     order,
-    attachments,
   });
 
   logActivity(
@@ -100,16 +92,9 @@ const getTaskById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Task not found");
   }
 
-  const subtasks = await Subtask.find({ task: taskId }).populate(
-    "createdBy",
-    POPULATE_USER,
-  );
-
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, { task, subtasks }, "Task fetched successfully"),
-    );
+    .json(new ApiResponse(200, task, "Task fetched successfully"));
 });
 
 const updateTask = asyncHandler(async (req, res) => {
@@ -194,8 +179,6 @@ const deleteTask = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Task not found");
   }
 
-  await Subtask.deleteMany({ task: taskId });
-
   logActivity(
     req.user._id,
     ActivityActionEnum.TASK_DELETED,
@@ -226,93 +209,6 @@ const reorderTasks = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Tasks reordered successfully"));
-});
-
-const createSubtask = asyncHandler(async (req, res) => {
-  const { projectId, taskId } = req.params;
-  const { title } = req.body;
-
-  const task = await Task.findOne({ _id: taskId, project: projectId });
-  if (!task) {
-    throw new ApiError(404, "Task not found");
-  }
-
-  const subtask = await Subtask.create({
-    title,
-    task: taskId,
-    createdBy: req.user._id,
-  });
-
-  logActivity(
-    req.user._id,
-    ActivityActionEnum.SUBTASK_CREATED,
-    projectId,
-    "subtask",
-    subtask._id,
-    { title: subtask.title },
-  );
-
-  return res
-    .status(201)
-    .json(new ApiResponse(201, subtask, "Subtask created successfully"));
-});
-
-const updateSubtask = asyncHandler(async (req, res) => {
-  const { projectId, subTaskId } = req.params;
-  const { title, isCompleted } = req.body;
-
-  const subtask = await Subtask.findById(subTaskId).populate("task");
-  if (!subtask) {
-    throw new ApiError(404, "Subtask not found");
-  }
-
-  if (!subtask.task.project.equals(projectId)) {
-    throw new ApiError(403, "Subtask does not belong to this project");
-  }
-
-  const updateFields = {};
-  if (title !== undefined) updateFields.title = title;
-  if (isCompleted !== undefined) updateFields.isCompleted = isCompleted;
-
-  const updated = await Subtask.findByIdAndUpdate(
-    subTaskId,
-    { $set: updateFields },
-    { new: true },
-  );
-
-  if (isCompleted !== undefined) {
-    logActivity(
-      req.user._id,
-      ActivityActionEnum.SUBTASK_COMPLETED,
-      projectId,
-      "subtask",
-      updated._id,
-      { isCompleted: updated.isCompleted },
-    );
-  }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, updated, "Subtask updated successfully"));
-});
-
-const deleteSubtask = asyncHandler(async (req, res) => {
-  const { projectId, subTaskId } = req.params;
-
-  const subtask = await Subtask.findById(subTaskId).populate("task");
-  if (!subtask) {
-    throw new ApiError(404, "Subtask not found");
-  }
-
-  if (!subtask.task.project.equals(projectId)) {
-    throw new ApiError(403, "Subtask does not belong to this project");
-  }
-
-  await Subtask.findByIdAndDelete(subTaskId);
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, "Subtask deleted successfully"));
 });
 
 const getProjectCalendar = asyncHandler(async (req, res) => {
@@ -346,8 +242,5 @@ export {
   updateTask,
   deleteTask,
   reorderTasks,
-  createSubtask,
-  updateSubtask,
-  deleteSubtask,
   getProjectCalendar,
 };

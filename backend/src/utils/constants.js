@@ -24,7 +24,6 @@ export const NotificationTypeEnum = {
   TASK_ASSIGNED: "task_assigned",
   ADDED_TO_PROJECT: "added_to_project",
   ROLE_CHANGED: "role_changed",
-  MENTIONED_IN_NOTE: "mentioned_in_note",
   MENTIONED_IN_COMMENT: "mentioned_in_comment",
 };
 export const AvailableNotificationTypes = Object.values(NotificationTypeEnum);
@@ -39,11 +38,6 @@ export const ActivityActionEnum = {
   TASK_CREATED: "task.created",
   TASK_UPDATED: "task.updated",
   TASK_DELETED: "task.deleted",
-  SUBTASK_CREATED: "subtask.created",
-  SUBTASK_COMPLETED: "subtask.completed",
-  NOTE_CREATED: "note.created",
-  NOTE_UPDATED: "note.updated",
-  NOTE_DELETED: "note.deleted",
   COMMENT_CREATED: "comment.created",
   COMMENT_UPDATED: "comment.updated",
   COMMENT_DELETED: "comment.deleted",

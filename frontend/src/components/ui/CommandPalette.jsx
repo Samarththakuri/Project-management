@@ -11,7 +11,7 @@ function buildItems(quickActions, results, query) {
     quickActions.forEach((a) => items.push({ type: 'action', ...a }))
     return items
   }
-  const { projects = [], tasks = [], notes = [], members = [] } = results || {}
+  const { projects = [], tasks = [], members = [] } = results || {}
   if (projects.length) {
     items.push({ type: 'header', label: 'Projects' })
     projects.forEach((p) =>
@@ -27,18 +27,6 @@ function buildItems(quickActions, results, query) {
         label: t.title,
         hint: t.project?.name,
         to: t.project?._id ? `/projects/${t.project._id}/board` : '#',
-      }),
-    )
-  }
-  if (notes.length) {
-    items.push({ type: 'header', label: 'Notes' })
-    notes.forEach((n) =>
-      items.push({
-        type: 'result',
-        icon: 'sticky_note_2',
-        label: (n.content || '').slice(0, 60),
-        hint: n.project?.name,
-        to: n.project?._id ? `/projects/${n.project._id}` : '#',
       }),
     )
   }
@@ -138,7 +126,7 @@ export default function CommandPalette({ isOpen, onClose, quickActions = [] }) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search projects, tasks, notes, members…"
+            placeholder="Search projects, tasks, members…"
             className="flex-1 bg-transparent outline-none text-body-lg font-geist text-on-surface placeholder:text-on-surface-variant"
           />
           {loading && (

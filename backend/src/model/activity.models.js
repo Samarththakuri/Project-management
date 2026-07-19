@@ -18,7 +18,7 @@ const activitySchema = new Schema(
     },
     resourceType: {
       type: String,
-      enum: ["project", "task", "subtask", "note", "member"],
+      enum: ["project", "task", "member"],
       default: null,
     },
     resourceId: {

@@ -48,16 +48,6 @@ const taskSchema = new Schema(
       type: Number,
       default: 0,
     },
-    attachments: {
-      type: [
-        {
-          url: String,
-          mimetype: String,
-          size: Number,
-        },
-      ],
-      default: [],
-    },
   },
   { timestamps: true },
 );

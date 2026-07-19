@@ -91,25 +91,3 @@ export const getTasksData = (users, projects) => [
     status: "todo",
   },
 ];
-
-export const getSubtasksData = (users, tasks) => [
-  // CI/CD pipeline subtasks
-  { title: "Add lint step to workflow", task: tasks[0]._id, createdBy: users[0]._id, isCompleted: true },
-  { title: "Add test step to workflow", task: tasks[0]._id, createdBy: users[0]._id, isCompleted: false },
-  { title: "Configure deployment to staging", task: tasks[0]._id, createdBy: users[0]._id, isCompleted: false },
-
-  // Database schema subtasks
-  { title: "User model complete", task: tasks[1]._id, createdBy: users[0]._id, isCompleted: true },
-  { title: "Project + ProjectMember models complete", task: tasks[1]._id, createdBy: users[0]._id, isCompleted: true },
-  { title: "Task + Subtask models complete", task: tasks[1]._id, createdBy: users[0]._id, isCompleted: true },
-
-  // Kanban board subtasks
-  { title: "Column layout with dnd-kit", task: tasks[5]._id, createdBy: users[1]._id, isCompleted: true },
-  { title: "Task card component", task: tasks[5]._id, createdBy: users[1]._id, isCompleted: true },
-  { title: "Task detail drawer", task: tasks[5]._id, createdBy: users[1]._id, isCompleted: false },
-  { title: "Subtask toggle in drawer", task: tasks[5]._id, createdBy: users[1]._id, isCompleted: false },
-
-  // SEO audit subtasks
-  { title: "Fix meta tags on blog pages", task: tasks[8]._id, createdBy: users[1]._id, isCompleted: false },
-  { title: "Add structured data to product pages", task: tasks[8]._id, createdBy: users[1]._id, isCompleted: false },
-];

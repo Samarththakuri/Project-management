@@ -8,7 +8,11 @@ import useAuthStore from "../../store/authStore";
 import { register as registerUser } from "../../api/auth.api";
 
 const schema = z.object({
-  username: z.string().min(2, "Full name is required"),
+  fullName: z.string().min(2, "Full name is required"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers, and underscores only"),
   email: z.string().email("Invalid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   terms: z.boolean().refine((v) => v === true, "You must accept the terms"),
@@ -33,6 +37,7 @@ export default function RegisterPage() {
     try {
       const res = await registerUser({
         username: data.username,
+        fullName: data.fullName,
         email: data.email,
         password: data.password,
       });
@@ -144,11 +149,20 @@ export default function RegisterPage() {
                 className="flex flex-col gap-5"
               >
                 <Input
-                  id="username"
+                  id="fullName"
                   label="Full Name"
                   type="text"
                   placeholder="Name"
                   icon="person"
+                  error={errors.fullName?.message}
+                  {...register("fullName")}
+                />
+                <Input
+                  id="username"
+                  label="Username"
+                  type="text"
+                  placeholder="lowercase_handle"
+                  icon="alternate_email"
                   error={errors.username?.message}
                   {...register("username")}
                 />

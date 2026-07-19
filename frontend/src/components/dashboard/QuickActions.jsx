@@ -21,7 +21,6 @@ export default function QuickActions({ firstProjectId }) {
     openCreateProject,
     openCreateTask,
     openInviteMember,
-    openCreateNote,
     openCommandPalette,
   } = useQuickActions()
 
@@ -30,7 +29,6 @@ export default function QuickActions({ firstProjectId }) {
       <ActionButton icon="create_new_folder" label="Create Project" onClick={openCreateProject} />
       <ActionButton icon="add_task" label="Create Task" onClick={openCreateTask} />
       <ActionButton icon="person_add" label="Invite Member" onClick={openInviteMember} />
-      <ActionButton icon="note_add" label="Create Note" onClick={openCreateNote} />
       <ActionButton
         icon="calendar_month"
         label="View Calendar"

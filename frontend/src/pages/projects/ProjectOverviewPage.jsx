@@ -1,18 +1,29 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Avatar, Badge, ProgressBar, Button } from "../../components/ui";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  Avatar,
+  Badge,
+  ProgressBar,
+  Button,
+  Modal,
+  Input,
+  Textarea,
+} from "../../components/ui";
 import {
   getProjectById,
   getMembers,
   addMember,
   updateMemberRole,
   removeMember,
+  updateProject,
+  deleteProject,
 } from "../../api/projects.api";
 import { getProjectTasks } from "../../api/tasks.api";
 import useAuthStore from "../../store/authStore";
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [project, setProject] = useState(null);
   const [members, setMembers] = useState([]);
@@ -25,6 +36,14 @@ export default function ProjectOverviewPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
+
+  // Edit / delete project state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", description: "" });
+  const [editBusy, setEditBusy] = useState(false);
+  const [editErr, setEditErr] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   function fetchData() {
     return Promise.all([
@@ -92,6 +111,46 @@ export default function ProjectOverviewPage() {
     }
   }
 
+  function openEdit() {
+    setEditErr("");
+    setEditForm({
+      name: project?.name || "",
+      description: project?.description || "",
+    });
+    setEditOpen(true);
+  }
+
+  async function handleUpdateProject(e) {
+    e.preventDefault();
+    if (!editForm.name.trim()) return setEditErr("Project name is required");
+    setEditBusy(true);
+    setEditErr("");
+    try {
+      const res = await updateProject(projectId, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+      });
+      setProject(res.data.data);
+      setEditOpen(false);
+    } catch (err) {
+      setEditErr(err?.response?.data?.message || "Failed to update project");
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  async function handleDeleteProject() {
+    setDeleteBusy(true);
+    try {
+      await deleteProject(projectId);
+      navigate("/projects", { replace: true });
+    } catch (err) {
+      console.error(err.response?.data || err);
+      setDeleteBusy(false);
+      setDeleteOpen(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-container-max mx-auto grid grid-cols-3 gap-gutter">
@@ -139,14 +198,36 @@ export default function ProjectOverviewPage() {
               </p>
             )}
           </div>
-          <Link to={`/projects/${projectId}/board`}>
-            <Button>
-              <span className="material-symbols-outlined text-[16px] select-none leading-none">
-                view_kanban
-              </span>
-              Open Board
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isAdmin && (
+              <>
+                <Button variant="secondary" onClick={openEdit}>
+                  <span className="material-symbols-outlined text-[16px] select-none leading-none">
+                    edit
+                  </span>
+                  Edit
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setDeleteOpen(true)}
+                  className="border-error/50 text-error hover:bg-error-container/20"
+                >
+                  <span className="material-symbols-outlined text-[16px] select-none leading-none">
+                    delete
+                  </span>
+                  Delete
+                </Button>
+              </>
+            )}
+            <Link to={`/projects/${projectId}/board`}>
+              <Button>
+                <span className="material-symbols-outlined text-[16px] select-none leading-none">
+                  view_kanban
+                </span>
+                Open Board
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Progress + avatars */}
@@ -403,6 +484,84 @@ export default function ProjectOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit project modal */}
+      {editOpen && (
+        <Modal
+          isOpen
+          onClose={() => setEditOpen(false)}
+          title="Edit Project"
+          maxWidth="max-w-lg"
+        >
+          {editErr && (
+            <div className="mb-4 px-4 py-3 border border-error bg-error-container/20 text-error text-body-md font-geist">
+              {editErr}
+            </div>
+          )}
+          <form onSubmit={handleUpdateProject} className="flex flex-col gap-5">
+            <Input
+              label="Project Name"
+              icon="folder"
+              value={editForm.name}
+              onChange={(e) =>
+                setEditForm({ ...editForm, name: e.target.value })
+              }
+            />
+            <Textarea
+              label="Description"
+              rows={3}
+              value={editForm.description}
+              onChange={(e) =>
+                setEditForm({ ...editForm, description: e.target.value })
+              }
+            />
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-outline-variant">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editBusy}>
+                {editBusy ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete project confirmation */}
+      {deleteOpen && (
+        <Modal
+          isOpen
+          onClose={() => setDeleteOpen(false)}
+          title="Delete Project"
+          maxWidth="max-w-md"
+        >
+          <p className="text-body-md font-geist text-on-surface-variant mb-6">
+            This permanently deletes{" "}
+            <span className="text-on-surface">{project.name}</span> and all of its
+            tasks and members. This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-outline-variant">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteProject}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? "Deleting…" : "Delete Project"}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

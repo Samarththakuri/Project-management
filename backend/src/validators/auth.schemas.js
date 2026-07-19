@@ -8,7 +8,7 @@ export const registerSchema = z.object({
     .min(3, "Username must be at least 3 characters long")
     .toLowerCase()
     .regex(/^[a-z0-9_]+$/, "Username must be lowercase alphanumeric"),
-  password: z.string().trim().min(1, "Password is required"),
+  password: z.string().trim().min(8, "Password must be at least 8 characters"),
   fullName: z.string().trim().optional(),
 });
 
@@ -20,7 +20,7 @@ export const loginSchema = z.object({
 
 export const changePasswordSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
-  newPassword: z.string().min(1, "New password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -28,5 +28,5 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  newPassword: z.string().min(1, "New password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
 });

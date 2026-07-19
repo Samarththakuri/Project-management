@@ -19,14 +19,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { KanbanCard, Badge, Avatar, Button, Input } from "../../components/ui";
+import { KanbanCard, Badge, Avatar, Button } from "../../components/ui";
 import BoardFilterBar from "../../components/ui/BoardFilterBar";
 import {
   getProjectTasks,
   getTaskById,
   createTask,
   updateTask,
-  updateSubtask,
   reorderTasks,
   deleteTask,
 } from "../../api/tasks.api";
@@ -231,23 +230,20 @@ function TaskDrawer({
   onDelete,
   projectId,
   isPrivileged,
+  members,
 }) {
   const { user } = useAuthStore();
-  const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
-  useEffect(() => {
-    if (!task?._id) return;
 
-    getTaskById(projectId, task._id)
-      .then((res) => {
-        setSubtasks(res.data.data.subtasks || []);
-      })
-      .catch(console.error);
-  }, [task, projectId]);
+  // Inline task edit-mode state.
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [form, setForm] = useState(null);
 
   useEffect(() => {
     if (!task?._id) return;
@@ -257,17 +253,47 @@ function TaskDrawer({
       .catch(() => {});
   }, [task?._id, projectId]);
 
-  async function toggleSubtask(subtask) {
+  function startEdit() {
+    setEditError("");
+    setForm({
+      title: task.title || "",
+      description: task.description || "",
+      status: task.status || "todo",
+      priority: task.priority || "medium",
+      assignee: task.assignee?._id || task.assignee || "",
+      dueDate: task.dueDate
+        ? new Date(task.dueDate).toISOString().slice(0, 10)
+        : "",
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!form.title.trim()) {
+      setEditError("Title is required");
+      return;
+    }
+    setSaving(true);
+    setEditError("");
     try {
-      await updateSubtask(projectId, task._id, subtask._id, {
-        isCompleted: !subtask.isCompleted,
-      });
-      setSubtasks((prev) =>
-        prev.map((s) =>
-          s._id === subtask._id ? { ...s, isCompleted: !s.isCompleted } : s,
-        ),
-      );
-    } catch {}
+      const patch = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        status: form.status,
+        priority: form.priority,
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
+      };
+      if (form.assignee) patch.assignee = form.assignee;
+      await updateTask(projectId, task._id, patch);
+      // Re-fetch to get a fully populated task (assignee/assigner).
+      const res = await getTaskById(projectId, task._id);
+      onUpdate(res.data.data);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err?.response?.data?.message || "Failed to update task");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAddComment() {
@@ -337,130 +363,219 @@ function TaskDrawer({
                 .toUpperCase()}
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px] select-none">
-              close
-            </span>
-          </button>
+          <div className="flex items-center gap-1">
+            {isPrivileged && !editing && (
+              <button
+                onClick={startEdit}
+                title="Edit task"
+                className="text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px] select-none">
+                  edit
+                </span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px] select-none">
+                close
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {/* Title + status */}
-          <div>
-            <h2 className="text-headline-sm font-geist text-on-surface mb-2">
-              {task.title}
-            </h2>
-            <Badge
-              variant={
-                task.status === "in_progress"
-                  ? "primary"
-                  : task.status === "review"
-                    ? "warning"
-                    : task.status === "done"
-                      ? "default"
-                      : "default"
-              }
-            >
-              {task.status.replace(/_/g, " ")}
-            </Badge>
-          </div>
-
-          {/* Description */}
-          {task.description && (
-            <div>
-              <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
-                Description
-              </p>
-              <p className="text-body-md font-geist text-on-surface leading-relaxed">
-                {task.description}
-              </p>
-            </div>
-          )}
-
-          {/* Assignee */}
-          {task.assignee && (
-            <div>
-              <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
-                Assignee
-              </p>
-              <div className="flex items-center gap-3">
-                <Avatar
-                  src={avatarSrc}
-                  name={
-                    task.assignee?.fullName || task.assignee?.username || ""
-                  }
-                  size="md"
+          {editing ? (
+            /* ---- Edit form ---- */
+            <div className="flex flex-col gap-4">
+              {editError && (
+                <div className="px-3 py-2 border border-error bg-error-container/20 text-error text-body-md font-geist">
+                  {editError}
+                </div>
+              )}
+              <div>
+                <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                  Title
+                </label>
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary"
                 />
-                <p className="text-body-md font-geist text-on-surface">
-                  {task.assignee?.fullName || task.assignee?.username}
-                </p>
+              </div>
+              <div>
+                <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                    Status
+                  </label>
+                  <select
+                    value={form.status}
+                    onChange={(e) =>
+                      setForm({ ...form, status: e.target.value })
+                    }
+                    className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary"
+                  >
+                    {COLUMNS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                    Priority
+                  </label>
+                  <select
+                    value={form.priority}
+                    onChange={(e) =>
+                      setForm({ ...form, priority: e.target.value })
+                    }
+                    className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary capitalize"
+                  >
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                    Assignee
+                  </label>
+                  <select
+                    value={form.assignee}
+                    onChange={(e) =>
+                      setForm({ ...form, assignee: e.target.value })
+                    }
+                    className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.user?._id} value={m.user?._id}>
+                        {m.user?.fullName || m.user?.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2 block">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) =>
+                      setForm({ ...form, dueDate: e.target.value })
+                    }
+                    className="w-full bg-surface-container border border-outline-variant text-body-md font-geist text-on-surface p-2 focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={saveEdit} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditing(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
-          )}
-
-          {/* Due date */}
-          {task.dueDate && (
-            <div>
-              <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
-                Due Date
-              </p>
-              <p className="text-body-md font-geist text-on-surface">
-                {new Date(task.dueDate).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-          )}
-
-          {/* Subtasks */}
-          {subtasks.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest">
-                  Subtasks
-                </p>
-                <span className="text-mono-label font-mono text-on-surface-variant">
-                  {subtasks.filter((s) => s.isCompleted).length}/
-                  {subtasks.length}
-                </span>
+          ) : (
+            <>
+              {/* Title + status */}
+              <div>
+                <h2 className="text-headline-sm font-geist text-on-surface mb-2">
+                  {task.title}
+                </h2>
+                <Badge
+                  variant={
+                    task.status === "in_progress"
+                      ? "primary"
+                      : task.status === "review"
+                        ? "warning"
+                        : "default"
+                  }
+                >
+                  {task.status.replace(/_/g, " ")}
+                </Badge>
               </div>
-              <ul className="flex flex-col gap-2">
-                {subtasks.map((subtask) => (
-                  <li key={subtask._id} className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleSubtask(subtask)}
-                      className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center transition-colors ${subtask.isCompleted ? "bg-primary-fixed-dim border-primary-fixed-dim" : "border-outline-variant bg-surface-container-low"}`}
-                    >
-                      {subtask.isCompleted && (
-                        <svg
-                          className="w-full h-full p-[3px]"
-                          viewBox="0 0 10 10"
-                          fill="none"
-                        >
-                          <path
-                            d="M1.5 5L4 7.5L8.5 2.5"
-                            stroke="#002022"
-                            strokeWidth="1.8"
-                            strokeLinecap="square"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                    <p
-                      className={`text-body-md font-geist ${subtask.isCompleted ? "text-on-surface-variant line-through" : "text-on-surface"}`}
-                    >
-                      {subtask.title}
+
+              {/* Description */}
+              {task.description && (
+                <div>
+                  <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
+                    Description
+                  </p>
+                  <p className="text-body-md font-geist text-on-surface leading-relaxed">
+                    {task.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Assignee */}
+              {task.assignee && (
+                <div>
+                  <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
+                    Assignee
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      src={avatarSrc}
+                      name={
+                        task.assignee?.fullName ||
+                        task.assignee?.username ||
+                        ""
+                      }
+                      size="md"
+                    />
+                    <p className="text-body-md font-geist text-on-surface">
+                      {task.assignee?.fullName || task.assignee?.username}
                     </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Due date */}
+              {task.dueDate && (
+                <div>
+                  <p className="text-mono-label font-mono text-on-surface-variant uppercase tracking-widest mb-2">
+                    Due Date
+                  </p>
+                  <p className="text-body-md font-geist text-on-surface">
+                    {new Date(task.dueDate).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Comments */}
@@ -832,6 +947,7 @@ export default function KanbanBoardPage() {
           onDelete={handleDeleteTask}
           projectId={projectId}
           isPrivileged={canAddTask}
+          members={members}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Badge, ProgressBar, Skeleton } from '../ui'
+import { Badge, Skeleton } from '../ui'
 import WidgetCard, { EmptyState } from './WidgetCard'
 import { dueLabel, daysUntil, priorityVariant } from '../../utils/format'
 
@@ -27,29 +27,12 @@ function TaskRow({ task, last }) {
         )}
       </div>
 
-      {task.subtaskTotal > 0 && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <ProgressBar value={task.progress} className="flex-1" />
-          <span className="text-mono-label font-mono text-on-surface-variant tabular-nums">
-            {task.subtaskDone}/{task.subtaskTotal}
-          </span>
-        </div>
-      )}
-
-      {(task.commentsCount > 0 || task.attachmentsCount > 0) && (
+      {task.commentsCount > 0 && (
         <div className="mt-2 flex items-center gap-4 text-on-surface-variant">
-          {task.commentsCount > 0 && (
-            <span className="flex items-center gap-1 text-mono-label font-mono">
-              <span className="material-symbols-outlined text-[13px] select-none leading-none">chat_bubble</span>
-              {task.commentsCount}
-            </span>
-          )}
-          {task.attachmentsCount > 0 && (
-            <span className="flex items-center gap-1 text-mono-label font-mono">
-              <span className="material-symbols-outlined text-[13px] select-none leading-none">attach_file</span>
-              {task.attachmentsCount}
-            </span>
-          )}
+          <span className="flex items-center gap-1 text-mono-label font-mono">
+            <span className="material-symbols-outlined text-[13px] select-none leading-none">chat_bubble</span>
+            {task.commentsCount}
+          </span>
         </div>
       )}
     </Link>

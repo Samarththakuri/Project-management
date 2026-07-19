@@ -54,17 +54,3 @@ export const reorderTasksSchema = z.object({
     )
     .min(1, "At least one task is required"),
 });
-
-export const createSubtaskSchema = z.object({
-  title: z.string().trim().min(1, "Subtask title is required"),
-});
-
-export const updateSubtaskSchema = z
-  .object({
-    title: z.string().trim().min(1).optional(),
-    isCompleted: z.boolean().optional(),
-  })
-  .refine(
-    (data) => data.title !== undefined || data.isCompleted !== undefined,
-    { message: "At least one field must be provided" },
-  );

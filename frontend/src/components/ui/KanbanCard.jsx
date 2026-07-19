@@ -3,9 +3,6 @@ import { Badge, Avatar } from '.'
 const priorityVariant = { high: 'error', critical: 'error', medium: 'warning', low: 'default', normal: 'default' }
 
 export default function KanbanCard({ task, onClick, dragListeners, dragAttributes, isDragging }) {
-  const subtaskDone = (task.subTasks || []).filter((s) => s.isCompleted).length
-  const subtaskTotal = (task.subTasks || []).length
-
   return (
     <div
       onClick={onClick}
@@ -25,14 +22,7 @@ export default function KanbanCard({ task, onClick, dragListeners, dragAttribute
       <p className="text-body-md font-geist text-on-surface leading-snug mb-3">{task.title}</p>
 
       <div className="flex items-center justify-between">
-        {subtaskTotal > 0 ? (
-          <div className="flex items-center gap-1.5 text-mono-label font-mono text-on-surface-variant">
-            <span className="material-symbols-outlined text-[14px] select-none">checklist</span>
-            {subtaskDone}/{subtaskTotal}
-          </div>
-        ) : (
-          <span />
-        )}
+        <span />
         {task.assignee && (
           <Avatar
             src={task.assignee?.avatar?.url ?? task.assignee?.avatar ?? null}

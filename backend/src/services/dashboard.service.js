@@ -151,8 +151,8 @@ export async function getSummary(userId, projectIds, w) {
 }
 
 /**
- * Tasks assigned to the current user (personal-first framing) with derived
- * progress and comment/attachment/subtask counts.
+ * Tasks assigned to the current user (personal-first framing) with a derived
+ * comment count.
  */
 export async function getMyTasks(userId) {
   return Task.aggregate([
@@ -168,14 +168,6 @@ export async function getMyTasks(userId) {
     { $unwind: { path: "$projectDoc", preserveNullAndEmptyArrays: true } },
     {
       $lookup: {
-        from: "subtasks",
-        localField: "_id",
-        foreignField: "task",
-        as: "subtasks",
-      },
-    },
-    {
-      $lookup: {
         from: "comments",
         localField: "_id",
         foreignField: "task",
@@ -184,39 +176,8 @@ export async function getMyTasks(userId) {
     },
     {
       $addFields: {
-        subtaskTotal: { $size: "$subtasks" },
-        subtaskDone: {
-          $size: {
-            $filter: {
-              input: "$subtasks",
-              cond: { $eq: ["$$this.isCompleted", true] },
-            },
-          },
-        },
         commentsCount: { $size: "$comments" },
-        attachmentsCount: { $size: { $ifNull: ["$attachments", []] } },
         project: { _id: "$projectDoc._id", name: "$projectDoc.name" },
-      },
-    },
-    {
-      $addFields: {
-        progress: {
-          $cond: [
-            { $gt: ["$subtaskTotal", 0] },
-            {
-              $round: [
-                {
-                  $multiply: [
-                    { $divide: ["$subtaskDone", "$subtaskTotal"] },
-                    100,
-                  ],
-                },
-                0,
-              ],
-            },
-            0,
-          ],
-        },
       },
     },
     {
@@ -225,11 +186,7 @@ export async function getMyTasks(userId) {
         status: 1,
         priority: 1,
         dueDate: 1,
-        progress: 1,
-        subtaskTotal: 1,
-        subtaskDone: 1,
         commentsCount: 1,
-        attachmentsCount: 1,
         project: 1,
       },
     },

@@ -12,6 +12,22 @@ Design reference: `DESIGN.md` (in this folder). Screenshots of all target screen
 
 ---
 
+## Recent Changes (2026-07-19)
+
+Gap-closure pass (see `docs/project-gaps.md` §0/§0.1):
+- **Notes UI removed** — `notes.api.js`, the Create-Note quick action + modal, and the
+  Command Palette notes group all deleted.
+- **Subtasks UI removed** — `updateSubtask` wrapper, the task-drawer subtask section, the
+  KanbanCard subtask badge, and the My-Tasks progress bar all removed.
+- **Task edit form ✅** — inline edit mode in the Kanban task drawer (admin/project-admin),
+  editing title/description/status/priority/assignee/due-date.
+- **Resend verification ✅** — button on the Settings page when the account is unverified.
+- **Project edit/delete ✅** — admin-only Edit + Delete actions on the Project Overview page.
+
+Sections below referencing Notes/Subtasks are historical and superseded by the above.
+
+---
+
 ## Frontend Reference
 
 Design reference screenshots, HTML mockups, and notes live in `frontend/frontendref/`.
@@ -85,7 +101,7 @@ frontend/src/
 | Page | Route | Status | Notes |
 |---|---|---|---|
 | Login | `/login` | ✅ | Split-screen layout: brand left, form right. Email + password fields, "Forgot?" link, corner accent decorations. |
-| Register | `/register` | ✅ | Same split-screen layout. Fields: Full Name, Work Email, Password, Terms checkbox. "INITIALIZE SEQUENCE" submit button. Shows success state with email verification notice. |
+| Register | `/register` | ✅ | Same split-screen layout. Fields: Full Name, **Username** (lowercase alphanumeric, min 3 — sent separately from Full Name), Work Email, Password (min 8), Terms checkbox. Now sends `fullName` distinctly from `username` (previously the "Full Name" input was wrongly bound to `username`). "INITIALIZE SEQUENCE" submit button. Shows success state with email verification notice. |
 | Forgot Password | `/forgot-password` | ✅ | Single-column form; POST to `/api/v1/auth/forgot-password` |
 | Reset Password | `/reset-password/:token` | ✅ | New password + confirm; POST to `/api/v1/auth/reset-password/:token` |
 | Verify Email | `/verify-email/:token` | ✅ | Auto-calls GET on mount; shows loading / success / error state |

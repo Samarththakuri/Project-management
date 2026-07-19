@@ -61,11 +61,6 @@ const ACTION_VERBS = {
   'task.created': 'created a task in',
   'task.updated': 'updated a task in',
   'task.deleted': 'deleted a task in',
-  'subtask.created': 'added a subtask in',
-  'subtask.completed': 'completed a subtask in',
-  'note.created': 'added a note in',
-  'note.updated': 'updated a note in',
-  'note.deleted': 'deleted a note in',
   'comment.created': 'commented in',
   'comment.updated': 'edited a comment in',
   'comment.deleted': 'deleted a comment in',
@@ -84,9 +79,6 @@ const ACTION_ICONS = {
   'task.created': 'add_task',
   'task.updated': 'edit',
   'task.deleted': 'delete',
-  'subtask.created': 'checklist',
-  'subtask.completed': 'check_circle',
-  'note.created': 'sticky_note_2',
   'comment.created': 'chat_bubble',
 }
 

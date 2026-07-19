@@ -5,12 +5,9 @@ import { User } from "../src/model/user.models.js";
 import { Project } from "../src/model/project.models.js";
 import { ProjectMember } from "../src/model/projectmember.models.js";
 import { Task } from "../src/model/task.model.js";
-import { Subtask } from "../src/model/subtask.models.js";
-import { Note } from "../src/model/note.models.js";
 import { usersData } from "./data/users.js";
 import { getProjectsData, getMembersData } from "./data/projects.js";
-import { getTasksData, getSubtasksData } from "./data/tasks.js";
-import { getNotesData } from "./data/notes.js";
+import { getTasksData } from "./data/tasks.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -23,8 +20,6 @@ const seed = async () => {
     Project.deleteMany({}),
     ProjectMember.deleteMany({}),
     Task.deleteMany({}),
-    Subtask.deleteMany({}),
-    Note.deleteMany({}),
   ]);
   console.log("Cleared all collections");
 
@@ -42,14 +37,6 @@ const seed = async () => {
 
   const tasks = await Task.insertMany(getTasksData(users, projects));
   console.log(`Seeded ${tasks.length} tasks`);
-
-  const subtasksData = getSubtasksData(users, tasks);
-  await Subtask.insertMany(subtasksData);
-  console.log(`Seeded ${subtasksData.length} subtasks`);
-
-  const notesData = getNotesData(users, projects);
-  await Note.insertMany(notesData);
-  console.log(`Seeded ${notesData.length} notes`);
 
   console.log("\nSeed complete ✓");
   console.log("\n─────────────────────────────────────────────");

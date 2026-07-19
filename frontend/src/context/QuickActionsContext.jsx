@@ -3,7 +3,6 @@ import { Modal, Button, Input, Textarea, Select } from '../components/ui'
 import CommandPalette from '../components/ui/CommandPalette'
 import { getProjects, createProject, addMember } from '../api/projects.api'
 import { createTask } from '../api/tasks.api'
-import { createNote } from '../api/notes.api'
 
 const QuickActionsContext = createContext(null)
 
@@ -181,47 +180,8 @@ function InviteMemberModal({ onClose, onDone, projects }) {
   )
 }
 
-function CreateNoteModal({ onClose, onDone, projects }) {
-  const [form, setForm] = useState(() => ({ project: projects[0]?._id || '', content: '' }))
-  const [err, setErr] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e) {
-    e.preventDefault()
-    if (!form.project) return setErr('Select a project')
-    if (!form.content.trim()) return setErr('Note content is required')
-    setBusy(true); setErr('')
-    try {
-      await createNote(form.project, { content: form.content })
-      onDone()
-      onClose()
-    } catch (e2) {
-      setErr(e2.response?.data?.message || 'Failed to create note')
-    } finally { setBusy(false) }
-  }
-
-  return (
-    <Modal isOpen onClose={onClose} title="New Note" maxWidth="max-w-lg">
-      <ErrorBox>{err}</ErrorBox>
-      {!projects.length ? (
-        <p className="text-body-md font-geist text-on-surface-variant">Create a project first.</p>
-      ) : (
-        <form onSubmit={submit} className="flex flex-col gap-5">
-          <ProjectSelect projects={projects} value={form.project} onChange={(v) => setForm({ ...form, project: v })} />
-          <Textarea label="Note" rows={5} placeholder="Write a note…"
-            value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-outline-variant">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create Note'}</Button>
-          </div>
-        </form>
-      )}
-    </Modal>
-  )
-}
-
 export function QuickActionsProvider({ children }) {
-  const [open, setOpen] = useState(null) // 'project' | 'task' | 'invite' | 'note' | null
+  const [open, setOpen] = useState(null) // 'project' | 'task' | 'invite' | null
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [projects, setProjects] = useState([])
   const [refreshKey, setRefreshKey] = useState(0)
@@ -258,7 +218,6 @@ export function QuickActionsProvider({ children }) {
       openCreateProject: () => setOpen('project'),
       openCreateTask: () => setOpen('task'),
       openInviteMember: () => setOpen('invite'),
-      openCreateNote: () => setOpen('note'),
       openCommandPalette: () => setPaletteOpen(true),
     }),
     [refreshKey, projects],
@@ -268,7 +227,6 @@ export function QuickActionsProvider({ children }) {
     { icon: 'create_new_folder', label: 'Create Project', onSelect: () => setOpen('project') },
     { icon: 'add_task', label: 'Create Task', onSelect: () => setOpen('task') },
     { icon: 'person_add', label: 'Invite Member', onSelect: () => setOpen('invite') },
-    { icon: 'note_add', label: 'Create Note', onSelect: () => setOpen('note') },
   ]
 
   const close = () => setOpen(null)
@@ -279,7 +237,6 @@ export function QuickActionsProvider({ children }) {
       {open === 'project' && <CreateProjectModal onClose={close} onDone={refresh} />}
       {open === 'task' && <CreateTaskModal onClose={close} onDone={refresh} projects={projects} />}
       {open === 'invite' && <InviteMemberModal onClose={close} onDone={refresh} projects={projects} />}
-      {open === 'note' && <CreateNoteModal onClose={close} onDone={refresh} projects={projects} />}
       <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} quickActions={quickActions} />
     </QuickActionsContext.Provider>
   )
