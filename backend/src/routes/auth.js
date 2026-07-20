@@ -19,13 +19,13 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "../validators/auth.schemas.js";
-import { verifyJWT } from "../middleware/auth.middleware.js";
+import { verifyJWT, optionalJWT } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
 router.route("/register").post(validate(registerSchema), registerUser);
 router.route("/login").post(validate(loginSchema), login);
-router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/logout").post(optionalJWT, logoutUser);
 router.route("/current-user").get(verifyJWT, getCurrentUser);
 router
   .route("/change-password")

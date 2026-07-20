@@ -18,10 +18,17 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, "Old password is required"),
-  newPassword: z.string().min(8, "New password must be at least 8 characters"),
-});
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, "Old password is required"),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters"),
+  })
+  .refine((d) => d.oldPassword !== d.newPassword, {
+    message: "New password must be different from your current password",
+    path: ["newPassword"],
+  });
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Email is invalid"),

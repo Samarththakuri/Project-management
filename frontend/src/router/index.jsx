@@ -17,7 +17,7 @@ import CalendarView from '../pages/projects/CalendarView'
 import SettingsPage from '../pages/settings/SettingsPage'
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, setUser } = useAuthStore()
+  const { isAuthenticated, setUser, clearUser } = useAuthStore()
   const [checking, setChecking] = useState(!isAuthenticated)
   const location = useLocation()
 
@@ -31,7 +31,10 @@ function ProtectedRoute({ children }) {
         setUser(res.data.data)
         setChecking(false)
       })
-      .catch(() => setChecking(false))
+      .catch(() => {
+        clearUser()
+        setChecking(false)
+      })
   }, [])
 
   if (checking) {

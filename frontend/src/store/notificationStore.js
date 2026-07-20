@@ -20,6 +20,8 @@ const useNotificationStore = create((set) => ({
       notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
       unreadCount: 0,
     })),
+  /** Drop everything — used on sign out so the next user starts clean. */
+  reset: () => set({ notifications: [], unreadCount: 0 }),
 }))
 
 export default useNotificationStore

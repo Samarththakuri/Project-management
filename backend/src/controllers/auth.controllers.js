@@ -1,4 +1,4 @@
-import { User } from "../model/user.models.js";
+import { User, USER_SAFE_FIELDS } from "../model/user.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
@@ -23,6 +23,12 @@ const cookieOptions = {
 const frontendBase = (process.env.CORS_ORIGIN || "http://localhost:5173")
   .split(",")[0]
   .trim();
+
+// Minimum gap between two verification emails for the same user.
+const RESEND_COOLDOWN_MS = 60 * 1000;
+// Lifetime baked into generateTemporaryToken(), used to derive when the last
+// verification email went out from the stored expiry.
+const TEMP_TOKEN_TTL_MS = 20 * 60 * 1000;
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -67,9 +73,7 @@ const registerUser = asyncHandler(async (request, response) => {
       `${frontendBase}/verify-email/${unHashedToken}`,
     ),
   });
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken -emailToken -emailVerificationToken -emailVerificationExpiry",
-  );
+  const createdUser = await User.findById(user._id).select(USER_SAFE_FIELDS);
   if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registring");
   }
@@ -77,7 +81,7 @@ const registerUser = asyncHandler(async (request, response) => {
     .status(201)
     .json(
       new ApiResponse(
-        200,
+        201,
         { user: createdUser },
         "User registered successfully and verification email has been sent to your email",
       ),
@@ -102,9 +106,7 @@ const login = asyncHandler(async (req, res) => {
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
     user._id, //yeh mongoose ka user id unique generated hai uske hissab se token karenge hum
   );
-  const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshToken",
-  );
+  const loggedInUser = await User.findById(user._id).select(USER_SAFE_FIELDS);
   return res
     .status(200)
     .cookie("accessToken", accessToken, cookieOptions)
@@ -120,17 +122,21 @@ const login = asyncHandler(async (req, res) => {
     );
 });
 const logoutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        refreshToken: "",
+  // Mounted behind optionalJWT: an expired or missing token still clears the
+  // cookies and reports success, so signing out is always idempotent.
+  if (req.user?._id) {
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          refreshToken: "",
+        },
       },
-    },
-    {
-      new: true,
-    },
-  );
+      {
+        new: true,
+      },
+    );
+  }
   return res
     .status(200)
     .clearCookie("accessToken", cookieOptions)
@@ -173,7 +179,24 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User does not exist");
   }
   if (user.isEmailVerified) {
-    throw new ApiError(409, "Email is alredy verified");
+    throw new ApiError(409, "Email is already verified");
+  }
+  // The last send time is implied by the stored expiry, so no extra field is
+  // needed: expiry - TTL == when that token was issued.
+  if (user.emailVerificationExpiry) {
+    const lastSentAt =
+      new Date(user.emailVerificationExpiry).getTime() - TEMP_TOKEN_TTL_MS;
+    const elapsed = Date.now() - lastSentAt;
+    if (elapsed < RESEND_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil(
+        (RESEND_COOLDOWN_MS - elapsed) / 1000,
+      );
+      throw new ApiError(
+        429,
+        "Please wait before requesting another verification email",
+        [{ retryAfterSeconds }],
+      );
+    }
   }
   const { unHashedToken, hashedToken, tokenExpiry } =
     user.generateTemporaryToken();
@@ -188,19 +211,17 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
       `${frontendBase}/verify-email/${unHashedToken}`,
     ),
   });
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken -emailToken -emailVerificationToken -emailVerificationExpiry",
-  );
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong while registring a");
+  const updatedUser = await User.findById(user._id).select(USER_SAFE_FIELDS);
+  if (!updatedUser) {
+    throw new ApiError(500, "Something went wrong while sending the email");
   }
   return res
-    .status(201)
+    .status(200)
     .json(
       new ApiResponse(
         200,
-        { user: createdUser },
-        "User registered successfully and verification email has been seant to your email",
+        { user: updatedUser },
+        "Verification email sent. Check your inbox.",
       ),
     );
 });
@@ -296,15 +317,32 @@ const resetForgotPassword = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
   const isPasswordValid = await user.isPasswordCorrect(oldPassword);
   if (!isPasswordValid) {
-    throw new ApiError(400, "Invalid old Password");
+    throw new ApiError(400, "Invalid old password");
+  }
+  if (oldPassword === newPassword) {
+    throw new ApiError(
+      400,
+      "New password must be different from your current password",
+    );
   }
   user.password = newPassword;
+  // Drop the stored refresh token so sessions on other devices die with the
+  // old password, then hand this browser a fresh pair so it stays signed in.
+  user.refreshToken = "";
   await user.save({ validateBeforeSave: false });
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id,
+  );
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Password changd sucessfully"));
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
 });
 export {
   registerUser,

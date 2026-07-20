@@ -101,3 +101,9 @@ userSchema.methods.generateTemporaryToken = function () {
   return { unHashedToken, hashedToken, tokenExpiry };
 };
 export const User = mongoose.model("User", userSchema);
+
+// Single projection for every place a user document is handed back to a client.
+// Keeps password hashes, session tokens and the hashed verify/reset tokens out
+// of API responses — use this instead of writing ad-hoc select strings.
+export const USER_SAFE_FIELDS =
+  "-password -refreshToken -emailVerificationToken -emailVerificationExpiry -forgotPasswordToken -forgotPasswordExpiry";

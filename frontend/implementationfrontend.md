@@ -12,6 +12,30 @@ Design reference: `DESIGN.md` (in this folder). Screenshots of all target screen
 
 ---
 
+## Recent Changes (2026-07-20)
+
+Settings page hardening pass:
+- **Live profile sync ✅** — `authStore` gained `refreshUser()` (wraps `GET /auth/current-user`)
+  and an `isLoading` flag. Settings re-syncs on mount and on window `focus` /
+  `visibilitychange` (throttled to one call per 3s), so verifying in another tab flips the
+  page from "Email not verified" to "Email verified" without a logout/login round trip.
+- **Resend cooldown ✅** — 60s client countdown (`Resend verification email (52s)`), seeded
+  from the server's `retryAfterSeconds` on a 429 so the two never disagree.
+- **Password form ✅** — Zod now mirrors the backend (`min(8)`, new ≠ current, confirm
+  matches); success banner auto-hides after 5s and clears on the next keystroke; proper
+  `autocomplete` values (`current-password` / `new-password` ×2) for password managers.
+- **Sign out ✅** — disabled while in flight; clears the auth **and** notification stores and
+  redirects to `/login` even when the API call fails.
+- **Shared error helper ✅** — `src/utils/errors.js` (`apiErrorMessage`, `retryAfterFromError`)
+  replaces the assume-it's-Axios `err.response.data.message` pattern.
+- **Accessibility ✅** — `role="status"` + `aria-live` on the verification state, `aria-busy`
+  on in-flight buttons, `aria-labelledby` on each section, `aria-hidden` on the decorative
+  status dot; native controls kept, so keyboard order is unchanged.
+- **Avatar fix ✅** — Settings was passing the raw `{ url, localPath }` object to `<Avatar src>`;
+  now uses the existing `avatarUrl()` helper like the dashboard widgets do.
+
+---
+
 ## Recent Changes (2026-07-19)
 
 Gap-closure pass (see `docs/project-gaps.md` §0/§0.1):
@@ -116,7 +140,7 @@ frontend/src/
 | Kanban Board | `/projects/:projectId/board` | ✅ | Four columns: Todo, In Progress, In Review, Done. Filter bar (search, priority chips, assignee). Task cards with priority badge, ID, subtask count, assignee avatar. Right drawer for task detail. dnd-kit drag-and-drop. |
 | Calendar View | `/projects/:projectId/calendar` | ✅ | Monthly grid; tasks render as chips on their due date; color by priority; task detail popover on click; prev/next month navigation. |
 | Chat | `/projects/:projectId/chat` | ❌ | Future enhancement — skip for v1. |
-| Settings | `/settings` | ✅ | User profile, change password, sign out. |
+| Settings | `/settings` | ✅ | User profile (loading skeleton until `/current-user` resolves), live email-verification status with 60s resend cooldown, change password (backend-mirrored rules, auto-hiding success banner), sign out with in-flight lock. ARIA-labelled sections + live regions. |
 
 ---
 
@@ -242,7 +266,8 @@ Status: ✅ (all DESIGN.md tokens configured in `tailwind.config.js`)
 10. ✅ Build Projects list page + Create Project modal (wired in AppLayout)
 11. ✅ Build Project Overview page (bento grid: Priority Tasks, Team, Task Stats)
 12. ✅ Build Kanban Board page + KanbanCard + task drawer + dnd-kit drag-and-drop
-13. ✅ Build Settings / Profile page (change password, sign out)
+13. ✅ Build Settings / Profile page (change password, sign out) — hardened 2026-07-20: focus-based
+    profile re-sync, resend cooldown, mirrored password rules, resilient logout, ARIA pass
 14. ❌ (Future) Chat page — deferred to v2
 15. ❌ (Future) File attachments on tasks
 16. ✅ Add member to project from UI — invite form in Team panel (Project Overview), visible to admin+project_admin
