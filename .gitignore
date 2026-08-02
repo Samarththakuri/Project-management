@@ -1,3 +1,5 @@
-docs/
+docs/*
+!docs/PRD.md
+!docs/API.md
 CLAUDE.md
 frontendref
