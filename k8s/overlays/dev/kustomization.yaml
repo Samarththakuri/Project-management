@@ -27,17 +27,17 @@ kind: Kustomization
 namespace: projectcamp-dev
 
 resources:
-  - namespace.yaml
-  - ../../base
+- namespace.yaml
+- ../../base
 
 labels:
-  - pairs:
-      app.kubernetes.io/instance: projectcamp-dev
-      environment: dev
+- pairs:
+    app.kubernetes.io/instance: projectcamp-dev
+    environment: dev
 
 patches:
-  - path: patches/configmap.yaml
-  - path: patches/resources.yaml
+- path: patches/configmap.yaml
+- path: patches/resources.yaml
 
 # Rewritten by .github/workflows/deploy.yml, which commits the change back to
 # this same repository:
@@ -47,7 +47,9 @@ patches:
 # tag: before CI has ever run, the pull fails loudly instead of silently starting
 # whatever some floating tag happens to point at.
 images:
-  - name: projectcamp-backend
-    newTag: NOT-DEPLOYED
-  - name: projectcamp-frontend
-    newTag: NOT-DEPLOYED
+- name: projectcamp-backend
+  newName: 435958718012.dkr.ecr.ap-south-1.amazonaws.com/projectcamp-backend
+  newTag: 5086aacda3d5710ecce0dfe17e2f45333c874739
+- name: projectcamp-frontend
+  newName: 435958718012.dkr.ecr.ap-south-1.amazonaws.com/projectcamp-frontend
+  newTag: 5086aacda3d5710ecce0dfe17e2f45333c874739
