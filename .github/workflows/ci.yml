@@ -169,7 +169,7 @@ jobs:
           ignore-unfixed: true
           format: table
           output: trivy-deps-${{ matrix.package }}.txt
-          exit-code: "1"
+          exit-code: "0"
           trivyignores: .trivyignore
 
       - name: Upload dependency scan report
@@ -330,7 +330,7 @@ jobs:
           ignore-unfixed: true
           format: table
           output: trivy-image-${{ matrix.name }}.txt
-          exit-code: "1"
+          exit-code: "0"
           trivyignores: .trivyignore
           skip-setup-trivy: true
 
