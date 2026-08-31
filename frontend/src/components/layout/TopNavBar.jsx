@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useMatch } from 'react-router-dom'
 import { Avatar } from '../ui'
 import NotificationPanel from '../ui/NotificationPanel'

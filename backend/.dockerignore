@@ -1,0 +1,35 @@
+# Everything here is either useless in the image, or actively dangerous to copy in.
+# A smaller build context also means faster builds and fewer cache invalidations.
+
+# Reinstalled inside the image for the correct platform. bcrypt is a native module,
+# so a host-built node_modules would be broken anyway.
+node_modules/
+
+# Secrets. The image must never contain these - they arrive at runtime from a
+# Kubernetes Secret backed by AWS Secrets Manager.
+.env
+.env.*
+!.env.example
+
+# Test-time only
+tests/
+coverage/
+vitest.config.js
+
+# Tooling and metadata
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+.prettierrc
+.prettierignore
+*.md
+npm-debug.log*
+
+# Seed data deletes every collection before inserting demo rows. It has no place
+# in a production image.
+scripts/
+
+# Runtime upload target: created empty, must not carry local files into the image.
+public/uploads/*
+!public/uploads/.gitkeep

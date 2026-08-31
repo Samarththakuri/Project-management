@@ -1,0 +1,41 @@
+# Horizontal autoscaling on CPU, backed by metrics-server (installed by Terraform).
+#
+# Note the interaction with GitOps: the HPA writes spec.replicas on the
+# Deployment, while this repository also declares it. Left alone, ArgoCD's
+# selfHeal would revert every scale-up within seconds. The ArgoCD Application
+# therefore declares an ignoreDifferences entry for /spec/replicas - without it,
+# autoscaling and GitOps actively fight each other.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: projectcamp-backend
+  labels:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: projectcamp-backend
+
+  minReplicas: 2
+  maxReplicas: 6
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Against the CPU *request* (100m), not the limit. 70% leaves headroom
+          # for the burst that arrives while new pods are still starting.
+          averageUtilization: 70
+
+  behavior:
+    scaleUp:
+      # React quickly to load.
+      stabilizationWindowSeconds: 30
+    scaleDown:
+      # Retreat slowly. A five-minute window stops the autoscaler oscillating on
+      # spiky traffic.
+      stabilizationWindowSeconds: 300

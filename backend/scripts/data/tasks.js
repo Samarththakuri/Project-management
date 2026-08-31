@@ -2,7 +2,8 @@ export const getTasksData = (users, projects) => [
   // ── Project Camp ──────────────────────────────────────
   {
     title: "Set up CI/CD pipeline",
-    description: "Configure GitHub Actions for automated testing and deployment",
+    description:
+      "Configure GitHub Actions for automated testing and deployment",
     project: projects[0]._id,
     assignedTo: users[1]._id,
     assignedBy: users[0]._id,
@@ -34,7 +35,8 @@ export const getTasksData = (users, projects) => [
   },
   {
     title: "Role-based access control",
-    description: "verifyProjectRole middleware for admin / project_admin / member",
+    description:
+      "verifyProjectRole middleware for admin / project_admin / member",
     project: projects[0]._id,
     assignedTo: users[1]._id,
     assignedBy: users[0]._id,
@@ -42,7 +44,8 @@ export const getTasksData = (users, projects) => [
   },
   {
     title: "Build Kanban board UI",
-    description: "Drag-and-drop columns with dnd-kit, task cards, and detail drawer",
+    description:
+      "Drag-and-drop columns with dnd-kit, task cards, and detail drawer",
     project: projects[0]._id,
     assignedTo: users[2]._id,
     assignedBy: users[0]._id,
@@ -84,7 +87,8 @@ export const getTasksData = (users, projects) => [
   },
   {
     title: "Update brand color tokens",
-    description: "Apply new palette across Tailwind config and all component styles",
+    description:
+      "Apply new palette across Tailwind config and all component styles",
     project: projects[1]._id,
     assignedTo: users[3]._id,
     assignedBy: users[1]._id,

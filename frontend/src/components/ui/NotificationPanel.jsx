@@ -39,7 +39,9 @@ export default function NotificationPanel({ onClose }) {
     try {
       await markAllAsRead()
       clearAll()
-    } catch {}
+    } catch {
+      // Non-critical: the badge re-syncs on the next poll.
+    }
   }
 
   return (

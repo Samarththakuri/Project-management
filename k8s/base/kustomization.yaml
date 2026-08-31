@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Environment-agnostic definition of the application. Nothing here names an
+# environment, a hostname, a namespace or an image tag - all of that arrives from
+# an overlay, which is what makes the same base safe to promote unchanged.
+
+resources:
+  - configmap.yaml
+  - services.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - servicemonitor.yaml
+
+# `labels` with includeSelectors: false, not the older `commonLabels`.
+# commonLabels also injects into spec.selector, and a Deployment's selector is
+# immutable after creation - so any future label change would require deleting
+# and recreating the Deployment. Selector labels are declared explicitly in each
+# manifest instead.
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: projectcamp
+      app.kubernetes.io/managed-by: argocd
+
+# THE CI CONTRACT
+#
+# These two names are the entire interface between the CI half of the pipeline
+# (.github/workflows/deploy.yml) and the GitOps half (this directory). deploy.yml
+# runs:
+#
+#   kustomize edit set image projectcamp-backend=<registry>/projectcamp-backend:<sha>
+#
+# against k8s/overlays/dev, which rewrites newName/newTag there. Renaming an entry
+# here without changing the workflow silently stops deployments from taking effect -
+# the manifests would still render, just with the old image.
+#
+# The placeholder tag below is intentionally not `latest`: an overlay that has
+# never been through CI fails to pull loudly instead of silently running whatever
+# `latest` happens to point at.
+images:
+  - name: projectcamp-backend
+    newTag: NOT-DEPLOYED
+  - name: projectcamp-frontend
+    newTag: NOT-DEPLOYED

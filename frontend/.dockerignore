@@ -1,0 +1,27 @@
+# The frontend Dockerfile does `COPY . .` before `npm run build`, so this file is
+# what keeps the build context honest.
+
+# Reinstalled in the builder stage.
+node_modules/
+
+# A stale dist/ exists in this working tree from a local build. Without this line
+# it would be copied into the builder and could shadow the fresh output.
+dist/
+dist-ssr/
+
+# Test-time only
+coverage/
+src/**/*.test.js
+src/**/*.test.jsx
+vitest.config.js
+
+# Tooling and metadata
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+*.md
+*.local
+npm-debug.log*
+.vscode/
+.idea/

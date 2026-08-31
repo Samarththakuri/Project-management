@@ -1,0 +1,68 @@
+# The single entry point.
+#
+#   Internet -> Route53 -> ALB -> (this Ingress) -> Service -> Pod
+#
+# One Ingress, one ALB, two path rules. This is what makes the SPA and the API
+# same-origin, which the frontend requires: src/api/axios.js hardcodes
+# baseURL "/api/v1" and sends cookies with withCredentials, so a split-origin
+# deployment would break authentication.
+#
+# TLS: this base is HTTP-only so the stack works before a domain exists. Each
+# overlay ships a patches/ingress-tls.yaml that adds the HTTPS listener, the
+# HTTP->HTTPS redirect, the ACM certificate and the host rule. Enable it by
+# uncommenting the patch in that overlay's kustomization.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: projectcamp
+  labels:
+    app.kubernetes.io/name: projectcamp
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+
+    # Register pod IPs directly instead of node ports. Removes a kube-proxy hop,
+    # and means target health tracks pod readiness rather than node health.
+    alb.ingress.kubernetes.io/target-type: ip
+
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
+    # Shallow check. Depth belongs in the readiness probe: because targets are
+    # pod IPs sourced from Service endpoints, an unready pod leaves the target
+    # group regardless of what the ALB itself probes. Both containers answer
+    # /healthz, so one path serves both target groups.
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/success-codes: "200"
+
+    # Must be shorter than terminationGracePeriodSeconds, or the ALB would still
+    # be draining a target the pod has already stopped serving.
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=20
+
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60,routing.http.drop_invalid_header_fields.enabled=true
+
+spec:
+  ingressClassName: alb
+  rules:
+    # No host here so the ALB's own DNS name works out of the box. The overlay
+    # TLS patch adds the real hostname.
+    - http:
+        paths:
+          # Order matters: the more specific /api prefix must precede the catch-all.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: projectcamp-backend
+                port:
+                  number: 8000
+
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: projectcamp-frontend
+                port:
+                  number: 8080

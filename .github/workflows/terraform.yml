@@ -1,0 +1,77 @@
+# Infrastructure code review gate.
+#
+# Deliberately read-only: it runs fmt and validate, never plan or apply, so it
+# needs no AWS credentials at all. Applying infrastructure stays a human action
+# run from a workstation with the appropriate role - see
+# docs/cicd/RUNBOOK.md section 4.
+#
+# This is a different decision from the application pipeline. The application is
+# deployed continuously because it changes many times a day and a bad change is
+# cheap to revert. Infrastructure changes rarely, and a bad `terraform apply` can
+# delete a VPC. Reading the plan yourself is worth the manual step.
+#
+# `terraform init -backend=false` initialises providers and modules without
+# touching the S3 state backend, which is what makes credential-free validation
+# possible.
+
+name: Terraform
+
+# Pull requests only. Every infrastructure change reaches main through a PR, so a
+# push trigger would re-validate a tree that was already validated minutes earlier
+# and could not have changed in between.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff infra/
+
+  validate:
+    name: Validate ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each root module has its own state and therefore its own init. The
+        # reusable modules under infra/terraform/modules are validated through
+        # the two roots that consume them.
+        stack:
+          - infra/terraform/cluster
+          - infra/terraform/platform
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: terraform init
+        working-directory: ${{ matrix.stack }}
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        working-directory: ${{ matrix.stack }}
+        run: terraform validate -no-color

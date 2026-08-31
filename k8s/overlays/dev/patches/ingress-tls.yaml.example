@@ -1,0 +1,46 @@
+# Adds TLS to the Ingress. Not applied until it is uncommented in
+# kustomization.yaml - see the instructions there.
+#
+# What this changes:
+#   - opens an HTTPS listener alongside HTTP
+#   - redirects every HTTP request to HTTPS with a 301
+#   - attaches the ACM certificate Terraform issued
+#   - binds the rules to a specific hostname
+#
+# Replace BOTH placeholders. The host must match the Route53 record and the
+# CORS_ORIGIN in patches/configmap.yaml, and the certificate must cover that host.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: projectcamp
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+
+    # The controller inserts a redirect action on the HTTP listener. Cookies are
+    # issued with Secure (NODE_ENV=production), so plain HTTP would otherwise
+    # produce a login that silently never persists.
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+    # terraform -chdir=infra/terraform/platform output -raw certificate_arn
+    alb.ingress.kubernetes.io/certificate-arn: REPLACE_WITH_CERTIFICATE_ARN
+
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+spec:
+  rules:
+    - host: dev.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: projectcamp-backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: projectcamp-frontend
+                port:
+                  number: 8080

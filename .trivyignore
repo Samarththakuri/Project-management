@@ -1,0 +1,16 @@
+# Trivy suppression list.
+#
+# RULES FOR THIS FILE
+#   1. Every entry needs a CVE id, an expiry date, and a written justification.
+#   2. "It is noisy" is not a justification. "Not reachable because X" is.
+#   3. An expired entry stops suppressing and the pipeline fails again on purpose -
+#      that is the mechanism that stops suppressions becoming permanent.
+#
+# Format:
+#   CVE-YYYY-NNNNN exp:YYYY-MM-DD
+#
+# The file is currently empty, and that is the intended state. Both package trees
+# were brought to `npm audit` clean while this pipeline was built (unused multer
+# dropped, nodemailer moved to 9.x, axios and react-router patched), so there is
+# nothing to suppress. Add an entry only when a finding is genuinely unfixable and
+# genuinely not exploitable in this application, and say why here.

@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projectcamp-backend
+  labels:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: backend
+spec:
+  # Overridden per overlay. Two is the minimum that lets maxUnavailable: 0 roll
+  # without ever dropping to zero serving pods.
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: projectcamp
+      app.kubernetes.io/component: backend
+
+  # How long a new pod has to become Ready before the rollout is declared failed.
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 5
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The zero-downtime contract: never take a pod away before its replacement
+      # is Ready. maxSurge 1 adds one extra pod at a time, maxUnavailable 0
+      # forbids dipping below the desired count.
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: projectcamp
+        app.kubernetes.io/component: backend
+    spec:
+      # Node drain and rolling update budget. Must exceed the app's own
+      # SHUTDOWN_TIMEOUT_MS (15s) plus the preStop sleep (5s), or Kubernetes would
+      # SIGKILL mid-drain.
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Spread replicas across AZs. With ScheduleAnyway this is a preference, so a
+      # single-AZ capacity crunch degrades placement instead of blocking the
+      # rollout entirely.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: projectcamp
+              app.kubernetes.io/component: backend
+
+      containers:
+        - name: backend
+          # The tag on this image is rewritten by CI via `kustomize edit set image`
+          # in the overlay. This bare name is the key that command matches on;
+          # renaming it here silently breaks every future deployment.
+          image: projectcamp-backend
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          envFrom:
+            # Non-sensitive configuration, committed in this repository.
+            - configMapRef:
+                name: projectcamp-config
+            # Sensitive configuration. This Secret is NOT in Git. It is created
+            # once, by hand, straight into the cluster:
+            #
+            #   kubectl -n projectcamp-dev create secret generic \
+            #     projectcamp-backend-secrets \
+            #     --from-literal=MONGO_URI=... --from-literal=ACCESS_TOKEN_SECRET=...
+            #
+            # Git names the Secret; only the cluster holds its values. optional is
+            # left at its default (false) on purpose: if the Secret is missing the
+            # pod fails to start loudly, rather than silently booting with an
+            # undefined MONGO_URI and crash-looping later for a confusing reason.
+            - secretRef:
+                name: projectcamp-backend-secrets
+
+          # Startup: connecting to MongoDB Atlas across the NAT gateway can take a
+          # few seconds. Allowing up to 60s here means a slow start is tolerated,
+          # while the liveness probe below can stay aggressive once running.
+          startupProbe:
+            httpGet:
+              path: /healthz/live
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+            timeoutSeconds: 2
+
+          # Liveness deliberately does NOT check MongoDB. If it did, a database
+          # blip would restart every pod simultaneously and turn a recoverable
+          # outage into a crash loop.
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          # Readiness DOES check MongoDB. A pod that cannot reach the database is
+          # removed from the Service endpoints, and therefore from the ALB target
+          # group, without being killed.
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+
+          lifecycle:
+            preStop:
+              exec:
+                # Endpoint removal and ALB target deregistration are asynchronous.
+                # Without this pause the process can stop before the load balancer
+                # has stopped sending it requests, producing 502s during an
+                # otherwise healthy rollout.
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              # No CPU limit on purpose: CFS throttling adds latency spikes that
+              # look exactly like an application problem. The request guarantees a
+              # share; memory is what actually needs a hard ceiling.
+              memory: 512Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+          volumeMounts:
+            # readOnlyRootFilesystem needs a writable /tmp for the Node runtime.
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

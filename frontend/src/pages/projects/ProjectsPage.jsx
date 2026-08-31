@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Avatar, Badge, ProgressBar } from '../../components/ui'
+import { Avatar, ProgressBar } from '../../components/ui'
 import { getProjects } from '../../api/projects.api'
 
 export default function ProjectsPage() {

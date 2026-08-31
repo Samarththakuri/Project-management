@@ -1,0 +1,80 @@
+# Local verification stack. NOT a deployment mechanism.
+#
+# This exists so the container images and the request topology can be proven on a
+# laptop before any AWS spend. It mirrors production shape:
+#
+#     gateway (nginx)  ~ AWS ALB + Ingress path rules
+#     frontend (nginx) ~ frontend Deployment/Service
+#     backend  (node)  ~ backend Deployment/Service
+#     mongo            ~ MongoDB Atlas
+#
+# Usage:
+#   docker compose up --build
+#   curl http://localhost:8080/healthz              # frontend, via the gateway
+#   curl http://localhost:8000/healthz/ready        # backend readiness, direct
+#   docker compose stop mongo                       # readiness must flip to 503
+#
+# Every value below is a throwaway local credential. In the cluster these arrive
+# from a Kubernetes Secret created with kubectl and never committed - see
+# docs/cicd/RUNBOOK.md section 5.
+
+name: projectcamp-local
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "8000"
+      MONGO_URI: mongodb://mongo:27017/projectcamp
+      # Must match the origin the browser actually uses: this value also builds the
+      # verification and password-reset links that go out by email.
+      CORS_ORIGIN: http://localhost:8080
+      ACCESS_TOKEN_SECRET: local-dev-access-secret-not-for-real-use
+      ACCESS_TOKEN_EXPIRY: 15m
+      REFRESH_TOKEN_SECRET: local-dev-refresh-secret-not-for-real-use
+      REFRESH_TOKEN_EXPIRY: 10d
+      # Point at a local MailHog/Mailtrap if you want to exercise email locally.
+      MAILTRAP_SMTP_HOST: ${MAILTRAP_SMTP_HOST:-}
+      MAILTRAP_SMTP_PORT: ${MAILTRAP_SMTP_PORT:-}
+      MAILTRAP_SMTP_USER: ${MAILTRAP_SMTP_USER:-}
+      MAILTRAP_SMTP_PASS: ${MAILTRAP_SMTP_PASS:-}
+    ports:
+      # Published only so readiness/metrics can be inspected directly. In EKS the
+      # backend is ClusterIP and is never reachable except through the ALB.
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./deploy/local/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+
+volumes:
+  mongo-data:

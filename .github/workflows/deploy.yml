@@ -1,0 +1,265 @@
+# Publish to ECR, then hand off to GitOps.
+#
+#   quality (reuses ci.yml)  ->  push-ecr  ->  update-manifests
+#                                                    |
+#                                              git commit to main
+#                                                    |
+#                                                  ArgoCD  ->  EKS
+#
+# This workflow is where the CI half of the pipeline ends. It authenticates to
+# AWS with OIDC, pushes an immutable SHA-tagged image to ECR, and records that
+# tag in k8s/overlays/dev. It contains no kubectl, no helm, and no cluster
+# credentials of any kind. ArgoCD is what deploys, by reconciling this repository
+# against the cluster - see argocd/application.yaml.
+#
+# Why not just run `kubectl apply` here? Because then this workflow would need
+# permanent cluster admin credentials, the cluster's real state would exist only
+# in whatever the last successful run happened to apply, drift would be
+# invisible, and rolling back would mean re-running a pipeline rather than
+# reverting a commit. Handing off through Git keeps the desired state auditable
+# and the deployer inside the cluster.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    # Without this, the commit THIS workflow makes to k8s/overlays/dev would
+    # itself look like a deployable change. Two protections apply:
+    #
+    #   1. GitHub does not trigger workflows for commits pushed with the default
+    #      GITHUB_TOKEN. That alone prevents the loop.
+    #   2. This paths-ignore, as belt and braces.
+    #
+    # It is also correct on its own terms: a hand-edit to k8s/ is a GitOps change
+    # that ArgoCD should pick up directly. There is no new image to build, so
+    # there is no reason to run this pipeline.
+    paths-ignore:
+      - "k8s/**"
+      - "argocd/**"
+      - "docs/**"
+      - "**.md"
+  workflow_dispatch:
+
+# A called workflow's job permissions may only be equal to or more restrictive
+# than the caller's. ci.yml's build-scan job requests security-events: write so it
+# can publish Trivy SARIF to code scanning, so that permission has to be granted
+# here too - otherwise the `quality` job below fails at startup, before it runs a
+# single test. Individual jobs still narrow this down to what they actually need.
+permissions:
+  contents: read
+  security-events: write
+
+# Serialise deployments. Two runs racing to update the same overlay would
+# otherwise produce a non-fast-forward push.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Every gate from ci.yml, re-run against this exact commit. Nothing below this
+  # job executes unless all of them pass: tests, lint, coverage, the SonarQube
+  # quality gate, and both Trivy scans.
+  #
+  # They already ran on the pull request, but they run again here because what
+  # was tested there was the PR's merge preview, not this merge commit.
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Quality and security gates
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Build and publish to ECR using short-lived OIDC credentials.
+  # ---------------------------------------------------------------------------
+  push-ecr:
+    name: Push to ECR (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [quality]
+    permissions:
+      # id-token: write is what lets the runner request a GitHub OIDC token and
+      # exchange it with AWS STS for temporary credentials. No long-lived
+      # AWS_ACCESS_KEY_ID exists anywhere in this repository's settings.
+      id-token: write
+      contents: read
+    outputs:
+      # Published so the manifest job writes the registry this job actually
+      # pushed to, rather than re-deriving it from an account id and region.
+      # Deriving it twice is how you get a commit that references a registry no
+      # image was ever pushed to. Both matrix legs resolve to the same value.
+      registry: ${{ steps.ecr.outputs.registry }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+          - name: frontend
+            context: ./frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # ONE tag, and it is the commit SHA.
+      #
+      # Not `latest`: `latest` is a moving pointer, so "which code is running in
+      # the cluster?" would have no answer, and redeploying it could silently
+      # change what runs. A SHA tag names exactly one commit and exactly one set
+      # of bytes forever - the ECR repository has tag immutability enabled, so
+      # this tag can never be repointed even deliberately. That is what makes
+      # rollback deterministic rather than hopeful.
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPO_PREFIX || 'projectcamp' }}-${{ matrix.name }}:${{ github.sha }}
+          # Reuses the layer cache populated by the build in ci.yml.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          provenance: false
+
+      - name: Summary
+        run: |
+          {
+            echo "### ${{ matrix.name }} published"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| tag | \`${{ github.sha }}\` |"
+            echo "| digest | \`${{ steps.build.outputs.digest }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Record the new image tag in k8s/overlays/dev and commit it.
+  #
+  # This is the handoff point. After this job the pipeline is finished: ArgoCD
+  # observes this repository and reconciles the cluster toward whatever
+  # k8s/overlays/dev now renders to.
+  # ---------------------------------------------------------------------------
+  update-manifests:
+    name: Update k8s manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [push-ecr]
+    permissions:
+      # The only elevated permission in this workflow, and it is scoped to this
+      # repository. Compare with the alternative: deploying from CI would need
+      # standing credentials to the Kubernetes API instead.
+      contents: write
+    env:
+      # Taken from the job that actually pushed, not re-derived. See that job's
+      # outputs block.
+      REGISTRY: ${{ needs.push-ecr.outputs.registry }}
+      PREFIX: ${{ vars.ECR_REPO_PREFIX || 'projectcamp' }}
+      KUSTOMIZE_VERSION: v5.8.1
+      KUSTOMIZE_SHA256: 029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d
+    steps:
+      # This repository, with the default GITHUB_TOKEN. There is no second repo
+      # and no personal access token: the manifests live here, next to the code
+      # that produced them.
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # Needed for the rebase retry below.
+          fetch-depth: 0
+
+      # Pinned by version and verified by checksum: a compromised or swapped
+      # release tarball fails here rather than silently rewriting manifests.
+      - name: Install kustomize
+        run: |
+          set -euo pipefail
+          curl -sSLo kustomize.tar.gz \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          echo "${KUSTOMIZE_SHA256}  kustomize.tar.gz" | sha256sum -c -
+          tar -xzf kustomize.tar.gz
+          sudo install -m 0755 kustomize /usr/local/bin/kustomize
+          rm -f kustomize kustomize.tar.gz
+          kustomize version
+
+      # `kustomize edit set image` rewrites the newTag of a named image entry.
+      # It is idempotent and structure-aware: re-running it produces no diff, and
+      # it cannot corrupt the file the way a sed or regex substitution can.
+      #
+      # The image NAMES (projectcamp-backend / projectcamp-frontend) are the
+      # entire contract between this workflow and k8s/. They are declared in
+      # k8s/base/kustomization.yaml; renaming one there without changing it here
+      # silently stops deployments from taking effect.
+      - name: Pin new image tags
+        working-directory: k8s/overlays/dev
+        run: |
+          set -euo pipefail
+          kustomize edit set image \
+            "${PREFIX}-backend=${REGISTRY}/${PREFIX}-backend:${{ github.sha }}" \
+            "${PREFIX}-frontend=${REGISTRY}/${PREFIX}-frontend:${{ github.sha }}"
+
+          echo "--- rendered image block ---"
+          cat kustomization.yaml
+
+      # Rendering here catches a malformed overlay before it is committed. If
+      # this fails, ArgoCD would instead have gone OutOfSync with a render error
+      # and the cluster would sit on the previous version with no clear cause.
+      - name: Validate rendered manifests
+        run: kustomize build k8s/overlays/dev > /dev/null
+
+      - name: Commit
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No change: overlay already pins ${{ github.sha }}."
+            exit 0
+          fi
+
+          git add k8s/overlays/dev/kustomization.yaml
+          git commit -m "chore(deploy): update image to ${{ github.sha }}" \
+                     -m "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push
+        if: steps.commit.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          # Someone may have merged to main while this job was working. Rebase
+          # and retry rather than failing the deployment outright.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt), rebasing onto origin/main."
+            git pull --rebase origin main
+          done
+          echo "::error::Could not push the manifest update after 3 attempts."
+          exit 1
+
+      - name: Summary
+        run: |
+          {
+            echo "### Manifests updated"
+            echo ""
+            echo "- image tag: \`${{ github.sha }}\`"
+            echo "- path: \`k8s/overlays/dev\`"
+            echo ""
+            echo "ArgoCD reconciles from here. CI never touches the cluster."
+          } >> "$GITHUB_STEP_SUMMARY"

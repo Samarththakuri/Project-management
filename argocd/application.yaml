@@ -1,0 +1,92 @@
+# ArgoCD Application: projectcamp (dev).
+#
+# This is the object that turns "YAML in Git" into GitOps. It does not deploy
+# anything once - it declares a permanent relationship:
+#
+#     desired state  =  kustomize build k8s/overlays/dev  @ main
+#     actual state   =  what is really running in namespace projectcamp-dev
+#
+# ArgoCD polls this repository (every ~3 minutes by default, or instantly via
+# webhook), renders the overlay, diffs it against the live cluster, and closes
+# the gap. It keeps doing that forever - not just when CI pushes.
+#
+# Note the source: it is THIS repository. GitHub Actions writes an image-tag
+# commit into k8s/overlays/dev and stops there. It holds no cluster credentials
+# and never runs kubectl. ArgoCD, running inside the cluster, is the only thing
+# that applies anything.
+#
+# Install with:
+#   kubectl apply -f argocd/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: projectcamp
+  # Applications live in the namespace ArgoCD itself runs in, not in the
+  # namespace of the workloads they manage.
+  namespace: argocd
+  finalizers:
+    # Ensures deleting this Application also removes the workloads it created,
+    # rather than orphaning them in the cluster.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # The built-in project. A dedicated AppProject would let you restrict which
+  # repos/clusters/kinds this app may touch; with a single app in a single dev
+  # cluster it would be ceremony without benefit.
+  project: default
+
+  source:
+    repoURL: https://github.com/Samarththakuri/Project-management.git
+    # Track the branch, not a fixed commit: that is what makes a push to main a
+    # deployment. Pinning a SHA here would mean editing this file to deploy.
+    targetRevision: main
+    # ArgoCD sees kustomization.yaml and renders with its built-in Kustomize.
+    # No plugin, no custom repo-server image.
+    path: k8s/overlays/dev
+
+  destination:
+    # The cluster ArgoCD itself runs in.
+    server: https://kubernetes.default.svc
+    namespace: projectcamp-dev
+
+  syncPolicy:
+    automated:
+      # Delete resources that were removed from Git. Without this, deleting a
+      # manifest would leave the object running forever and Git would stop being
+      # a complete description of the cluster.
+      prune: true
+      # Revert manual kubectl edits. This is the line that makes Git the source
+      # of truth rather than merely a record of intent: `kubectl scale` is
+      # undone within minutes, automatically.
+      selfHeal: true
+
+    syncOptions:
+      # The Namespace object ships in the overlay (it carries the Pod Security
+      # Standards labels), so ArgoCD must not invent a bare one.
+      - CreateNamespace=false
+      # Server-side apply: avoids the last-applied-configuration annotation
+      # size limit and merges cleanly with other field managers (e.g. the HPA).
+      - ServerSideApply=true
+      # Delete removed resources only after the new ones are healthy.
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+
+  # How many past syncs stay available for `argocd app rollback`. This is a
+  # convenience, not the real rollback mechanism - the real one is `git revert`,
+  # which is why it is set modestly.
+  revisionHistoryLimit: 10
+
+  ignoreDifferences:
+    # The HorizontalPodAutoscaler writes spec.replicas, and this repository also
+    # declares it. Without this, selfHeal would revert every scale-up within
+    # seconds and the two controllers would fight indefinitely - the application
+    # would sit permanently OutOfSync while silently refusing to scale.
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

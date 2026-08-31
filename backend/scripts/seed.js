@@ -1,4 +1,3 @@
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import connectDB from "../src/db/index.js";
 import { User } from "../src/model/user.models.js";
@@ -9,7 +8,8 @@ import { usersData } from "./data/users.js";
 import { getProjectsData, getMembersData } from "./data/projects.js";
 import { getTasksData } from "./data/tasks.js";
 
-dotenv.config({ path: "./.env" });
+// MONGO_URI comes from `node --env-file=.env` (see the npm "seed" script), so
+// this must be run from the backend/ directory: `npm run seed`.
 
 const seed = async () => {
   await connectDB();
@@ -44,9 +44,13 @@ const seed = async () => {
   console.log("─────────────────────────────────────────────");
   console.log("  alice@example.com  →  admin      on 'Project Camp'");
   console.log("  bob@example.com    →  project_admin on 'Project Camp'");
-  console.log("                        admin      on 'Marketing Site Redesign'");
+  console.log(
+    "                        admin      on 'Marketing Site Redesign'",
+  );
   console.log("  carol@example.com  →  member     on both projects");
-  console.log("  dave@example.com   →  member     on 'Marketing Site Redesign' only");
+  console.log(
+    "  dave@example.com   →  member     on 'Marketing Site Redesign' only",
+  );
   console.log("─────────────────────────────────────────────\n");
   await mongoose.disconnect();
   process.exit(0);

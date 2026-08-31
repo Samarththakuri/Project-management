@@ -305,6 +305,7 @@ function TaskDrawer({
       setComments((prev) => [...prev, res.data.data]);
       setCommentInput("");
     } catch {
+      // Swallowed intentionally: the comment list refetches on drawer reopen.
     } finally {
       setSubmittingComment(false);
     }
@@ -322,14 +323,18 @@ function TaskDrawer({
       );
       setEditingId(null);
       setEditContent("");
-    } catch {}
+    } catch {
+      // Swallowed intentionally: the comment list refetches on drawer reopen.
+    }
   }
 
   async function handleDeleteComment(commentId) {
     try {
       await deleteComment(projectId, task._id, commentId);
       setComments((prev) => prev.filter((c) => c._id !== commentId));
-    } catch {}
+    } catch {
+      // Swallowed intentionally: the comment list refetches on drawer reopen.
+    }
   }
 
   const priorityVariant = {
@@ -853,7 +858,9 @@ export default function KanbanBoardPage() {
       });
       try {
         if (reordered) await reorderTasks(projectId, reordered);
-      } catch {}
+      } catch {
+        // Optimistic reorder already applied locally; server order re-syncs on refetch.
+      }
     } else {
       // Dropped on a column droppable (empty column)
       const columnId = over.id;

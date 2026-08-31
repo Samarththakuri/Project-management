@@ -1,0 +1,20 @@
+# Provider binaries and module caches - large, machine-specific, re-downloadable.
+**/.terraform/
+**/.terraform.lock.hcl.bak
+
+# Local state. Both stacks use the S3 backend, so these should never appear -
+# but committing state would publish every resource id and any sensitive
+# attribute a provider returned, so the rule stays as a safety net.
+*.tfstate
+*.tfstate.*
+**/terraform.tfstate.d/
+
+# Real backend values. backend.hcl holds the state bucket name, which embeds the
+# AWS account id. backend.hcl.example is the committed one.
+backend.hcl
+*.auto.tfvars
+terraform.tfvars
+
+# Plan output can contain sensitive values in plaintext.
+*.tfplan
+crash.log

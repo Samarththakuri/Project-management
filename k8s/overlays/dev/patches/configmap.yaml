@@ -1,0 +1,16 @@
+# CORS_ORIGIN must be the exact origin users hit in the browser. It is both the
+# CORS allowlist and the base URL for emailed verification and reset links, so a
+# wrong value here produces working logins with broken emails.
+#
+# Before a domain exists, set this to the ALB hostname:
+#   kubectl -n projectcamp-dev get ingress projectcamp \
+#     -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: projectcamp-config
+data:
+  CORS_ORIGIN: "https://dev.example.com"
+  # Shorter sessions in dev make expiry and refresh behaviour easy to exercise.
+  ACCESS_TOKEN_EXPIRY: "15m"
+  REFRESH_TOKEN_EXPIRY: "1d"

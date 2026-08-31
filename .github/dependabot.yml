@@ -1,0 +1,83 @@
+# Keeps every pinned thing in this repository from silently rotting.
+#
+# Pinning is what makes the pipeline reproducible, but a pin with nobody updating
+# it becomes an unpatched vulnerability. Dependabot is the other half of that
+# bargain: Trivy fails the build on a known CVE, Dependabot opens the PR that
+# fixes it.
+
+version: 2
+
+updates:
+  # --- Application dependencies -------------------------------------------
+  # Monthly, not weekly. Weekly across five ecosystems produced more review load
+  # than a two-person team can absorb, and unreviewed Dependabot PRs are worse than
+  # none: they train you to ignore the thing that is supposed to be a signal.
+  # Trivy fails the build on a known CVE the day it lands, so the urgent path is
+  # already covered; this is the routine-hygiene path.
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine patch/minor bumps keeps review noise down; majors stay
+      # separate because they need real attention.
+      backend-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(backend)"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(frontend)"
+
+  # --- Container base images ----------------------------------------------
+  # The Dockerfiles pin base images by digest. Without this, that digest would
+  # never move and the images would accumulate unpatched OS CVEs.
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(docker)"
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(docker)"
+
+  # --- GitHub Actions -----------------------------------------------------
+  # Every action is pinned to a commit SHA to prevent tag-repointing attacks.
+  # Dependabot understands SHA pins and updates them along with the version
+  # comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(actions)"
+
+  # --- Terraform ----------------------------------------------------------
+  - package-ecosystem: terraform
+    directories:
+      - /infra/terraform/cluster
+      - /infra/terraform/platform
+      - /infra/terraform/modules/*
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(terraform)"

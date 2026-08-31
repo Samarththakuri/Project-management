@@ -1,0 +1,39 @@
+# ArgoCD Application: Grafana dashboards.
+#
+# Separate from the application Application because it targets a different
+# namespace (monitoring, created by Terraform when it installs
+# kube-prometheus-stack) and has a completely different lifecycle - it changes
+# when someone edits a dashboard, not when the app is redeployed.
+#
+# It is managed by ArgoCD rather than applied by hand for the same reason
+# everything else is: so the dashboard in the cluster is guaranteed to match the
+# dashboard in Git, and an accidental edit in the Grafana UI gets reverted.
+#
+# Install with:
+#   kubectl apply -f argocd/application-monitoring.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: projectcamp-dashboards
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Samarththakuri/Project-management.git
+    targetRevision: main
+    path: k8s/monitoring
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Created by Terraform when it installs kube-prometheus-stack.
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

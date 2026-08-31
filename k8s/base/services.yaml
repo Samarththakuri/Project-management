@@ -1,0 +1,44 @@
+# ClusterIP, not NodePort.
+#
+# The ALB reaches pods directly by pod IP (the Ingress uses target-type: ip), so
+# there is no reason to open a port on every node. NodePort would widen the
+# attack surface and add a hop for nothing.
+#
+# The Service still matters with ip targeting: the AWS Load Balancer Controller
+# builds the target group from this Service's endpoints, which is how a pod that
+# fails its readiness probe is removed from the load balancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: projectcamp-backend
+  labels:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: projectcamp-frontend
+  labels:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: frontend

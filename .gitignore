@@ -1,5 +1,31 @@
 docs/*
 !docs/PRD.md
 !docs/API.md
+# The CI/CD documentation is part of the deliverable, so it has to escape the
+# blanket docs/* rule above. Both the directory and its contents need un-ignoring:
+# git will not descend into an excluded directory to find a negated file inside it.
+!docs/cicd/
+!docs/cicd/**
 CLAUDE.md
 frontendref
+
+# Coverage reports, produced by npm run test:coverage and consumed by SonarQube.
+coverage/
+*.lcov
+# Terraform local state, plans, and working directory
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!dev.tfvars
+crash.log
+crash.*.log
+
+# Local Terraform backend configuration
+backend.hcl
+
+# Terraform plan/output text files
+plan.txt
+fixed-plan.txt
+final-plan.txt

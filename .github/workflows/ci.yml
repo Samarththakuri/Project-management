@@ -1,0 +1,345 @@
+# Quality and security gates. This workflow NEVER publishes anything.
+#
+# It runs on every pull request, and is also called by deploy.yml via
+# workflow_call so that the exact same gates run before any image is pushed.
+# There is no code path in this file that authenticates to AWS, pushes to ECR or
+# touches a Kubernetes cluster - the separation is structural, not a convention.
+#
+#   backend-quality  ─┐
+#   frontend-quality ─┼→ sonarqube ─┐
+#   dependency-scan  ─────────────  ┴→ build-scan
+#
+# Gate enforcement comes from `needs:`. A failed job leaves every downstream job
+# in a `skipped` state, so a broken test or a failed quality gate cannot be
+# stepped over. No job uses `continue-on-error`, and no gate uses `if: always()`.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes an in-flight run obsolete. Cancelling
+# saves runner minutes without weakening any gate, because the newer run repeats
+# every check from scratch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  # Severity threshold for the security gate, overridable per repository without
+  # editing this file. CRITICAL alone is the documented minimum; HIGH is included
+  # by default because both dependency trees are currently clean at that level.
+  TRIVY_SEVERITY: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: format check, unit + integration tests, coverage
+  # ---------------------------------------------------------------------------
+  backend-quality:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # The integration tests run against mongodb-memory-server, which downloads a
+      # real MongoDB binary on first use. Caching it turns a ~60s download into a
+      # cache hit on every subsequent run.
+      - name: Cache MongoDB binaries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-v1
+
+      # npm ci, not npm install: it installs exactly the lockfile and fails if
+      # package.json and the lockfile have drifted apart.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (Prettier format check)
+        run: npm run lint
+
+      - name: Unit and integration tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage for SonarQube
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: backend-coverage
+          path: backend/coverage/lcov.info
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Frontend: ESLint, unit tests, coverage, production build
+  # ---------------------------------------------------------------------------
+  frontend-quality:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      # The build is itself a gate: the frontend image build would fail later
+      # anyway, and failing here gives a far clearer error.
+      - name: Production build
+        run: npm run build
+
+      - name: Upload coverage for SonarQube
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Dependency vulnerability scan (source tree, not image)
+  #
+  # This is not redundant with the image scan. The frontend image contains only
+  # the compiled bundle served by nginx - node_modules never reaches it - so a
+  # vulnerable frontend dependency is invisible to an image scan. Scanning the
+  # lockfiles is the only way to see it.
+  # ---------------------------------------------------------------------------
+  dependency-scan:
+    name: Dependency scan (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # One scan that both reports and gates. Trivy writes the report file before
+      # it exits, so the artifact below exists even on the run where this fails -
+      # which is the run you actually need it on. exit-code 1 fails the job, which
+      # blocks build-scan, which blocks everything downstream.
+      #
+      # The report is filtered to TRIVY_SEVERITY rather than listing every
+      # severity. That is the tradeoff for scanning once instead of twice: the
+      # artifact now shows what failed the gate rather than everything Trivy saw.
+      # Run `trivy fs backend` locally for the unfiltered picture.
+      - name: Scan lockfile and gate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ matrix.package }}
+          scanners: vuln,secret
+          severity: ${{ env.TRIVY_SEVERITY }}
+          ignore-unfixed: true
+          format: table
+          output: trivy-deps-${{ matrix.package }}.txt
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: Upload dependency scan report
+        # always(): the report matters most when the step above just failed.
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: trivy-deps-${{ matrix.package }}
+          path: trivy-deps-${{ matrix.package }}.txt
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # SonarQube static analysis + Quality Gate
+  # ---------------------------------------------------------------------------
+  sonarqube:
+    name: SonarQube quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [backend-quality, frontend-quality]
+    steps:
+      # Full history: Sonar uses it to attribute issues to authors and to compute
+      # "new code" for the gate. A shallow clone silently degrades both.
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      # Fail early and legibly rather than letting the scanner emit a connection
+      # error 30 seconds later.
+      - name: Verify SonarQube configuration
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          missing=""
+          [ -z "$SONAR_HOST_URL" ] && missing="$missing SONAR_HOST_URL"
+          [ -z "$SONAR_TOKEN" ] && missing="$missing SONAR_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secret(s):$missing"
+            echo "Set them under Settings > Secrets and variables > Actions."
+            echo "See docs/cicd/RUNBOOK.md section 3 for how to set up SonarCloud."
+            exit 1
+          fi
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+      - name: Download frontend coverage
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+
+      # Reads sonar-project.properties from the repository root, which declares
+      # the backend and frontend modules and where each LCOV report lives.
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # The scan itself only submits the analysis. This step polls until the
+      # server has finished computing the Quality Gate and fails the job if the
+      # gate is red - which is what "wait for the gate" actually requires.
+      - name: SonarQube quality gate
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
+        timeout-minutes: 10
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          pollingTimeoutSec: 600
+          scanMetadataReportFile: .scannerwork/report-task.txt
+
+  # ---------------------------------------------------------------------------
+  # Build both images and scan them. Nothing is pushed here.
+  #
+  # Both images are built on every run, even if only one package changed. That is
+  # deliberate: the GitOps overlay pins both images to the same commit SHA, so a
+  # tag that exists for one image but not the other would produce an
+  # ImagePullBackOff that is tedious to diagnose. Building both keeps the
+  # "one commit = one deployable set" invariant true.
+  # ---------------------------------------------------------------------------
+  build-scan:
+    name: Build and scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [sonarqube, dependency-scan]
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+          - name: frontend
+            context: ./frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # load: true (not push) puts the image in the local daemon so Trivy can
+      # inspect the exact artifact that would ship. Scanning a rebuilt image would
+      # not prove anything about the one being published.
+      - name: Build image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          load: true
+          tags: projectcamp-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          provenance: false
+
+      # SARIF at every severity, never gating. This one feeds the Security tab,
+      # where the full range is useful for browsing and triage - that view is the
+      # reason to keep an unfiltered scan at all. Free on public repositories;
+      # on a private repo the upload below would need Advanced Security.
+      #
+      # No `secret` scanner here: the fs scan in dependency-scan already scanned
+      # this source tree for secrets, and GitHub's own secret scanning covers the
+      # repository. Nothing enters these images that those two do not see.
+      - name: Scan image (SARIF for code scanning)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: projectcamp-${{ matrix.name }}:${{ github.sha }}
+          scanners: vuln
+          format: sarif
+          output: trivy-image-${{ matrix.name }}.sarif
+          exit-code: "0"
+
+      - name: Publish SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3
+        with:
+          sarif_file: trivy-image-${{ matrix.name }}.sarif
+          category: trivy-image-${{ matrix.name }}
+
+      # The gate, and the human-readable report, in one scan. Same pattern as
+      # dependency-scan above: Trivy writes the table before exiting non-zero, so
+      # the artifact survives a failure.
+      - name: Scan image and gate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: projectcamp-${{ matrix.name }}:${{ github.sha }}
+          scanners: vuln
+          severity: ${{ env.TRIVY_SEVERITY }}
+          ignore-unfixed: true
+          format: table
+          output: trivy-image-${{ matrix.name }}.txt
+          exit-code: "1"
+          trivyignores: .trivyignore
+          skip-setup-trivy: true
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: trivy-image-${{ matrix.name }}
+          path: |
+            trivy-image-${{ matrix.name }}.txt
+            trivy-image-${{ matrix.name }}.sarif
+          retention-days: 7

@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { ApiError } from "./utils/api-error.js";
 import healthCheckRouter from "./routes/healthcheck.js";
+import healthRouter from "./routes/health.js";
 import authRouter from "./routes/auth.js";
 import projectRouter from "./routes/project.js";
 import taskRouter from "./routes/task.js";
@@ -11,7 +12,20 @@ import commentRouter from "./routes/comment.js";
 import globalSearchRouter from "./routes/globalsearch.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { requestLogger } from "./middleware/logger.js";
+import { metricsMiddleware, metricsHandler } from "./middleware/metrics.js";
 const app = express();
+
+// Prometheus instrumentation. First in the chain so it observes every request,
+// including ones rejected by body parsers or CORS. Opt out with METRICS_ENABLED=false.
+const metricsEnabled = process.env.METRICS_ENABLED !== "false";
+if (metricsEnabled) {
+  app.use(metricsMiddleware);
+}
+
+// Kubernetes probes. Mounted before the logger so probe traffic (every few
+// seconds, per pod) does not drown the request log.
+app.use("/healthz", healthRouter);
+
 // basic configurations middleware hai
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.originalUrl}`);
@@ -41,6 +55,12 @@ app.use("/api/v1", notificationRouter);
 app.use("/api/v1/projects", commentRouter);
 app.use("/api/v1/search", globalSearchRouter);
 app.use("/api/v1/dashboard", dashboardRouter);
+
+// Prometheus scrape target. Not exposed publicly: the Ingress only routes /api
+// to this Service, so /metrics is reachable only from inside the cluster.
+if (metricsEnabled) {
+  app.get("/metrics", metricsHandler);
+}
 
 app.get("/", (req, res) => {
   res.send("Welcome to basecampy");

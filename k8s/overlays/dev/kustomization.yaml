@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Development overlay - THE GITOPS SOURCE OF TRUTH.
+#
+# ArgoCD watches exactly this directory (see argocd/application.yaml). Whatever
+# `kustomize build k8s/overlays/dev` renders is what ArgoCD makes true in the
+# cluster. Nothing else deploys this application.
+#
+# ENABLING TLS
+#   patches/ingress-tls.yaml.example is a template, not a live patch - it carries
+#   placeholder values, which is why it is .example rather than something kustomize
+#   could be pointed at by mistake. Once a domain exists:
+#     1. set domain_name in platform/dev.tfvars and apply, to mint the certificate
+#     2. terraform -chdir=../../../infra/terraform/platform output -raw certificate_arn
+#     3. cp patches/ingress-tls.yaml.example patches/ingress-tls.yaml, then fill in
+#        that ARN and the hostname
+#     4. add `- path: patches/ingress-tls.yaml` to the patches list below
+#     5. set the same hostname as CORS_ORIGIN in patches/configmap.yaml
+#   Step 5 is not optional: CORS_ORIGIN is both the CORS allowlist and the base URL
+#   for emailed verification links. Until all this is done the app serves over HTTP
+#   at the ALB's own DNS name. See docs/cicd/RUNBOOK.md section 5.
+#
+# NOTE: `kustomize edit set image` rewrites this file on every deployment and
+# normalises formatting. Keep comments above top-level keys, where they survive.
+
+namespace: projectcamp-dev
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: projectcamp-dev
+      environment: dev
+
+patches:
+  - path: patches/configmap.yaml
+  - path: patches/resources.yaml
+
+# Rewritten by .github/workflows/deploy.yml, which commits the change back to
+# this same repository:
+#   kustomize edit set image projectcamp-backend=<registry>/projectcamp-backend:<sha>
+#
+# NOT-DEPLOYED is the pre-first-deployment placeholder, deliberately not a real
+# tag: before CI has ever run, the pull fails loudly instead of silently starting
+# whatever some floating tag happens to point at.
+images:
+  - name: projectcamp-backend
+    newTag: NOT-DEPLOYED
+  - name: projectcamp-frontend
+    newTag: NOT-DEPLOYED

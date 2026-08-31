@@ -1,0 +1,25 @@
+# Dev runs the smallest footprint that still proves the rollout mechanics: two
+# replicas is the minimum for maxUnavailable: 0 to mean anything.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projectcamp-backend
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: backend
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projectcamp-frontend
+spec:
+  replicas: 2

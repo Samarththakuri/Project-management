@@ -2,7 +2,7 @@
 
 A self-hosted project management workspace for small teams — projects with role-based membership, a drag-and-drop Kanban board, task comments with `@mentions`, in-app notifications, and a single-request analytics dashboard.
 
-![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5.1-000000?logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose%208-47A248?logo=mongodb&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -17,6 +17,7 @@ A self-hosted project management workspace for small teams — projects with rol
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
+- [Deployment and CI/CD](#deployment-and-cicd)
 - [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
 - [Demo Data](#demo-data)
@@ -74,29 +75,29 @@ A self-hosted project management workspace for small teams — projects with rol
 
 ### Backend
 
-| Package | Version | Role |
-| --- | --- | --- |
-| `express` | ^5.1.0 | HTTP server and routing |
-| `mongoose` | ^8.19.1 | MongoDB ODM |
-| `zod` | ^4.4.3 | Request body validation |
-| `jsonwebtoken` | ^9.0.2 | Access and refresh tokens |
-| `bcrypt` | ^6.0.0 | Password hashing |
-| `nodemailer` + `mailgen` | ^7.0.10 / ^2.0.32 | Transactional email |
-| `cookie-parser`, `cors`, `morgan` | — | Cookies, CORS, request logging |
+| Package                           | Version           | Role                           |
+| --------------------------------- | ----------------- | ------------------------------ |
+| `express`                         | ^5.1.0            | HTTP server and routing        |
+| `mongoose`                        | ^8.19.1           | MongoDB ODM                    |
+| `zod`                             | ^4.4.3            | Request body validation        |
+| `jsonwebtoken`                    | ^9.0.2            | Access and refresh tokens      |
+| `bcrypt`                          | ^6.0.0            | Password hashing               |
+| `nodemailer` + `mailgen`          | ^7.0.10 / ^2.0.32 | Transactional email            |
+| `cookie-parser`, `cors`, `morgan` | —                 | Cookies, CORS, request logging |
 
 ### Frontend
 
-| Package | Version | Role |
-| --- | --- | --- |
-| `react` / `react-dom` | ^19.2.6 | UI runtime |
-| `vite` | ^8.0.12 | Dev server and bundler |
-| `react-router-dom` | ^7.17.0 | Routing |
-| `tailwindcss` | ^3.4.19 | Styling |
-| `zustand` | ^5.0.14 | Client state |
-| `axios` | ^1.17.0 | HTTP client with refresh interceptor |
-| `react-hook-form` + `zod` | ^7.77.0 / ^4.4.3 | Forms and validation |
-| `recharts` | ^3.9.2 | Dashboard charts |
-| `@dnd-kit/core` + `@dnd-kit/sortable` | ^6.3.1 / ^10.0.0 | Kanban drag and drop |
+| Package                               | Version          | Role                                 |
+| ------------------------------------- | ---------------- | ------------------------------------ |
+| `react` / `react-dom`                 | ^19.2.6          | UI runtime                           |
+| `vite`                                | ^8.0.12          | Dev server and bundler               |
+| `react-router-dom`                    | ^7.17.0          | Routing                              |
+| `tailwindcss`                         | ^3.4.19          | Styling                              |
+| `zustand`                             | ^5.0.14          | Client state                         |
+| `axios`                               | ^1.17.0          | HTTP client with refresh interceptor |
+| `react-hook-form` + `zod`             | ^7.77.0 / ^4.4.3 | Forms and validation                 |
+| `recharts`                            | ^3.9.2           | Dashboard charts                     |
+| `@dnd-kit/core` + `@dnd-kit/sortable` | ^6.3.1 / ^10.0.0 | Kanban drag and drop                 |
 
 ## Architecture
 
@@ -149,18 +150,62 @@ Every handler is wrapped in `asyncHandler`, which forwards rejections to the glo
 Failures are thrown as `ApiError` and serialized as:
 
 ```json
-{ "statusCode": 404, "message": "Project not found", "errors": [], "success": false }
+{
+  "statusCode": 404,
+  "message": "Project not found",
+  "errors": [],
+  "success": false
+}
 ```
 
 ### Authentication
 
 The frontend never handles tokens directly. The backend sets `accessToken` and `refreshToken` as httpOnly cookies; the axios instance sends them with `withCredentials: true`. On a `401`, a response interceptor queues concurrent requests, calls `POST /api/v1/auth/refresh-token` once, replays the queue, and redirects to `/login` if the refresh itself fails. `verifyJWT` also accepts an `Authorization: Bearer <token>` header, which is what makes the API usable from curl or Postman.
 
+## Deployment and CI/CD
+
+The application ships through a GitOps pipeline: GitHub Actions builds and gates,
+Amazon ECR stores immutable artifacts, Terraform provisions AWS, and ArgoCD
+reconciles an EKS cluster against this repository.
+
+```
+ Developer ──► pull request
+                   │
+                   ▼
+   CI:  tests · lint · coverage · Trivy · SonarQube · docker build
+        (every one a gate; publishes nothing)
+                   │  merge to main
+                   ▼
+   Deploy:  OIDC → AWS  ·  push image tagged <git-sha> to ECR
+            update k8s/overlays/dev  ·  commit back to main
+                   │
+                   │  ═══ CI ends here. No kubectl, no cluster credentials. ═══
+                   ▼
+   ArgoCD:  render Kustomize → diff against live → apply → repeat forever
+                   │
+                   ▼
+   EKS:  Deployment → Service → Ingress → AWS ALB → User
+              /api → backend    /  → frontend
+```
+
+The `k8s/` directory is the **source of truth** for what runs in the cluster —
+not a script that deploys, but the desired state itself. ArgoCD continuously
+compares it against reality and closes the gap, so a manual `kubectl edit` is
+reverted automatically and a rollback is a `git revert`.
+
+| Directory                                  | Contains                                                                      |
+| ------------------------------------------ | ----------------------------------------------------------------------------- |
+| [`infra/terraform/`](infra/terraform/)     | VPC, EKS, ECR, GitHub OIDC (`cluster/`) and in-cluster platform (`platform/`) |
+| [`k8s/`](k8s/)                             | Kustomize base + `overlays/dev` — what ArgoCD watches                         |
+| [`argocd/`](argocd/)                       | The ArgoCD `Application` objects                                              |
+| [`.github/workflows/`](.github/workflows/) | `ci.yml`, `deploy.yml`, `terraform.yml`                                       |
+| [`docker-compose.yml`](docker-compose.yml) | Local stack mirroring the ALB path split                                      |
+
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18 or newer
+- Node.js 22 or newer (both `package.json` files declare `"engines": { "node": ">=22" }`, and CI pins Node 22)
 - A MongoDB instance — local, or a MongoDB Atlas connection string
 - An SMTP account for verification and password-reset email (Mailtrap works well for development)
 
@@ -215,20 +260,20 @@ The app is served at <http://localhost:5173>. Make sure `CORS_ORIGIN` in `backen
 
 All of these live in `backend/.env`. The frontend has no environment file — it reaches the API through the relative path `/api/v1`, resolved by the Vite proxy in development and by your reverse proxy in production.
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `PORT` | No | Port the API listens on. Defaults to `3000`; set it to `8000` to match the frontend proxy. |
-| `NODE_ENV` | No | Set to `production` to enable the `secure` flag on auth cookies (requires HTTPS). |
-| `MONGO_URI` | Yes | MongoDB connection string, e.g. `mongodb://127.0.0.1:27017/projectcamp`. |
-| `CORS_ORIGIN` | Yes | Comma-separated allowed origins. The **first entry** is also the base URL used to build verification and password-reset links in outgoing email, so it must point at the frontend. |
-| `ACCESS_TOKEN_SECRET` | Yes | Signing secret for access tokens. |
-| `ACCESS_TOKEN_EXPIRY` | Yes | Access token lifetime, e.g. `15m`. |
-| `REFRESH_TOKEN_SECRET` | Yes | Signing secret for refresh tokens. |
-| `REFRESH_TOKEN_EXPIRY` | Yes | Refresh token lifetime, e.g. `10d`. |
-| `MAILTRAP_SMTP_HOST` | Yes | SMTP host. |
-| `MAILTRAP_SMTP_PORT` | Yes | SMTP port. |
-| `MAILTRAP_SMTP_USER` | Yes | SMTP username. |
-| `MAILTRAP_SMTP_PASS` | Yes | SMTP password. |
+| Variable               | Required | Description                                                                                                                                                                        |
+| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                 | No       | Port the API listens on. Defaults to `3000`; set it to `8000` to match the frontend proxy.                                                                                         |
+| `NODE_ENV`             | No       | Set to `production` to enable the `secure` flag on auth cookies (requires HTTPS).                                                                                                  |
+| `MONGO_URI`            | Yes      | MongoDB connection string, e.g. `mongodb://127.0.0.1:27017/projectcamp`.                                                                                                           |
+| `CORS_ORIGIN`          | Yes      | Comma-separated allowed origins. The **first entry** is also the base URL used to build verification and password-reset links in outgoing email, so it must point at the frontend. |
+| `ACCESS_TOKEN_SECRET`  | Yes      | Signing secret for access tokens.                                                                                                                                                  |
+| `ACCESS_TOKEN_EXPIRY`  | Yes      | Access token lifetime, e.g. `15m`.                                                                                                                                                 |
+| `REFRESH_TOKEN_SECRET` | Yes      | Signing secret for refresh tokens.                                                                                                                                                 |
+| `REFRESH_TOKEN_EXPIRY` | Yes      | Refresh token lifetime, e.g. `10d`.                                                                                                                                                |
+| `MAILTRAP_SMTP_HOST`   | Yes      | SMTP host.                                                                                                                                                                         |
+| `MAILTRAP_SMTP_PORT`   | Yes      | SMTP port.                                                                                                                                                                         |
+| `MAILTRAP_SMTP_USER`   | Yes      | SMTP username.                                                                                                                                                                     |
+| `MAILTRAP_SMTP_PASS`   | Yes      | SMTP password.                                                                                                                                                                     |
 
 ## Demo Data
 
@@ -241,12 +286,12 @@ npm run seed
 
 It creates four accounts, all with the password `Password@123`:
 
-| Email | Role |
-| --- | --- |
-| `alice@example.com` | `admin` on *Project Camp* |
-| `bob@example.com` | `project_admin` on *Project Camp*, `admin` on *Marketing Site Redesign* |
-| `carol@example.com` | `member` on both projects |
-| `dave@example.com` | `member` on *Marketing Site Redesign* |
+| Email               | Role                                                                    |
+| ------------------- | ----------------------------------------------------------------------- |
+| `alice@example.com` | `admin` on _Project Camp_                                               |
+| `bob@example.com`   | `project_admin` on _Project Camp_, `admin` on _Marketing Site Redesign_ |
+| `carol@example.com` | `member` on both projects                                               |
+| `dave@example.com`  | `member` on _Marketing Site Redesign_                                   |
 
 Signing in as each one is the quickest way to see how the role checks change the interface.
 
@@ -254,36 +299,36 @@ Signing in as each one is the quickest way to see how the role checks change the
 
 ### `backend/`
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the API with nodemon and hot reload |
-| `npm start` | Start the API with plain node |
-| `npm run seed` | Reset the database and load demo data |
-| `npx prettier --write src/` | Format the source tree |
+| Command                     | Description                               |
+| --------------------------- | ----------------------------------------- |
+| `npm run dev`               | Start the API with nodemon and hot reload |
+| `npm start`                 | Start the API with plain node             |
+| `npm run seed`              | Reset the database and load demo data     |
+| `npx prettier --write src/` | Format the source tree                    |
 
 ### `frontend/`
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server on port 5173 |
-| `npm run build` | Build the production bundle into `dist/` |
-| `npm run preview` | Serve the built bundle locally |
-| `npm run lint` | Run ESLint |
+| Command           | Description                              |
+| ----------------- | ---------------------------------------- |
+| `npm run dev`     | Start the Vite dev server on port 5173   |
+| `npm run build`   | Build the production bundle into `dist/` |
+| `npm run preview` | Serve the built bundle locally           |
+| `npm run lint`    | Run ESLint                               |
 
 ## API
 
 Base path: `/api/v1`. Full request and response details, including query parameters, role requirements, and curl examples, are in **[docs/API.md](docs/API.md)**.
 
-| Area | Base path | Endpoints |
-| --- | --- | --- |
-| Healthcheck | `/api/v1/healthcheck` | 1 |
-| Auth | `/api/v1/auth` | 10 |
-| Projects and members | `/api/v1/projects` | 9 |
-| Tasks | `/api/v1/projects/:projectId/tasks` | 7 |
-| Comments | `/api/v1/projects/:projectId/tasks/:taskId/comments` | 4 |
-| Notifications | `/api/v1/notifications` | 3 |
-| Search | `/api/v1/search` | 1 |
-| Dashboard | `/api/v1/dashboard` | 2 |
+| Area                 | Base path                                            | Endpoints |
+| -------------------- | ---------------------------------------------------- | --------- |
+| Healthcheck          | `/api/v1/healthcheck`                                | 1         |
+| Auth                 | `/api/v1/auth`                                       | 10        |
+| Projects and members | `/api/v1/projects`                                   | 9         |
+| Tasks                | `/api/v1/projects/:projectId/tasks`                  | 7         |
+| Comments             | `/api/v1/projects/:projectId/tasks/:taskId/comments` | 4         |
+| Notifications        | `/api/v1/notifications`                              | 3         |
+| Search               | `/api/v1/search`                                     | 1         |
+| Dashboard            | `/api/v1/dashboard`                                  | 2         |
 
 ## Design System
 

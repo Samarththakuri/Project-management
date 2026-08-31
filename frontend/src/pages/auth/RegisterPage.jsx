@@ -1,10 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Button, Input, Checkbox } from "../../components/ui";
-import useAuthStore from "../../store/authStore";
 import { register as registerUser } from "../../api/auth.api";
 
 const schema = z.object({
@@ -19,8 +18,9 @@ const schema = z.object({
 });
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const setUser = useAuthStore((s) => s.setUser);
+  // No navigate/setUser here by design: registration does not sign the user in.
+  // It renders a "check your email" state and the user authenticates after
+  // verifying, so there is no session to store and nowhere to redirect to.
   const [serverError, setServerError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -35,13 +35,12 @@ export default function RegisterPage() {
     // console.log(data);
     setServerError("");
     try {
-      const res = await registerUser({
+      await registerUser({
         username: data.username,
         fullName: data.fullName,
         email: data.email,
         password: data.password,
       });
-      // console.log("REGISTER RESPONSE:", res);
       setSuccess(true);
     } catch (err) {
       setServerError(err.response?.data?.message || "Registration failed");

@@ -1,0 +1,27 @@
+# Tells Prometheus to scrape the backend's /metrics endpoint.
+#
+# Only the backend is listed. The frontend is static nginx with no application
+# metrics, so claiming a ServiceMonitor for it would create a permanently failing
+# target - the pipeline should not pretend to monitor what the app cannot expose.
+# Frontend health comes from kube-state-metrics and the ALB target group instead.
+#
+# The kube-prometheus-stack install sets serviceMonitorSelectorNilUsesHelmValues
+# to false, which is what allows Prometheus to discover this object in the
+# application's own namespace.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: projectcamp-backend
+  labels:
+    app.kubernetes.io/name: projectcamp
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: projectcamp
+      app.kubernetes.io/component: backend
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

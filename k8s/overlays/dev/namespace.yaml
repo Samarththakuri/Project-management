@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: projectcamp-dev
+  labels:
+    # Pod Security Standards, enforced by the built-in admission controller.
+    # `restricted` requires runAsNonRoot, dropped capabilities, a seccomp profile
+    # and no privilege escalation - all of which the Deployments already satisfy.
+    # Enforcing it here means a future manifest that regresses on any of those is
+    # rejected at admission rather than quietly running as root.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

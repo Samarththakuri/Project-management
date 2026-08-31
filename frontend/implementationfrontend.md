@@ -12,6 +12,46 @@ Design reference: `DESIGN.md` (in this folder). Screenshots of all target screen
 
 ---
 
+## Recent Changes (2026-08-12)
+
+Deployment-readiness pass, alongside the CI/CD pipeline in `docs/cicd/`. No
+feature or visual change — the rendered UI is identical.
+
+- **Vite React plugin registered ✅** — `vite.config.js` imported
+  `@vitejs/plugin-react` but never added it to a `plugins` array, so React Fast
+  Refresh was silently off in development (and ESLint flagged the unused import).
+  Now `plugins: [react()]`. Production output is unchanged; Vite already applied
+  the automatic JSX runtime to `.jsx`.
+- **Test suite ✅ (first one in the project)** — Vitest with 26 tests covering
+  `src/utils/format.js` and `src/utils/errors.js` at **100%** statements,
+  branches and functions. Config lives in a separate `vitest.config.js` so the
+  build config is untouched. Scripts: `npm test`, `npm run test:coverage`.
+- **ESLint now passes ✅** — `npm run lint` previously exited with 20 errors, which
+  would have blocked CI on day one. Fixed mechanically and without behaviour
+  change: removed unused imports/bindings (`useRef` in TopNavBar, `Badge` in
+  ProjectsPage, `navigate`/`setUser`/`res` in RegisterPage), and documented the
+  five empty `catch {}` blocks instead of leaving them bare.
+- **Two rules downgraded to warnings ⚠️** — `react-hooks/set-state-in-effect`
+  (8 occurrences) and `react-hooks/exhaustive-deps` (4) fire on pre-existing
+  effect patterns in ProtectedRoute, the auth pages and the dashboard. Each fix
+  needs that component's intent understood, so they are tracked as debt rather
+  than changed blind. SonarQube still reports them, and CI still fails on any
+  *new* error. **TODO: resolve and restore both to `error`.**
+- **Dependency security ✅** — `npm audit` brought to zero: `axios` 1.17 → 1.19
+  (10 advisories) and `react-router` 7.17 → 7.18 (5 advisories, including an open
+  redirect in `<Link>`/`useNavigate`). Both were in-range patches.
+
+### Deployment note
+`src/api/axios.js` hardcodes `baseURL: '/api/v1'` with `withCredentials: true`
+and reads no environment variable. The SPA therefore **must** be served
+same-origin with the API. The production Ingress does this with one ALB and two
+path rules (`/api` → backend, `/` → frontend); the frontend's nginx serves static
+files only and has no `proxy_pass`. Do not split them onto separate hostnames
+without first making the API base URL configurable and reworking cookie auth for
+cross-origin.
+
+---
+
 ## Recent Changes (2026-07-20)
 
 Settings page hardening pass:

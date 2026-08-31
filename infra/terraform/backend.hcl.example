@@ -1,0 +1,17 @@
+# Shared backend settings for both stacks.
+#
+#   cp backend.hcl.example backend.hcl        (backend.hcl is gitignored)
+#
+# then, in each stack directory:
+#
+#   terraform init -backend-config=../backend.hcl
+#
+# The bucket name is not committed because it embeds the AWS account id. The
+# per-stack `key` lives in each stack's own versions.tf - that is what keeps
+# cluster and platform in separate state files while sharing one bucket.
+#
+# Create the bucket first; Terraform cannot store its state in a bucket that does
+# not exist yet. See docs/cicd/RUNBOOK.md section 4.1.
+
+bucket = "projectcamp-tfstate-REPLACE_WITH_ACCOUNT_ID"
+region = "eu-west-1"

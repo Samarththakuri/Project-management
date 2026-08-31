@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Grafana dashboards.
+#
+# Deployed into the monitoring namespace rather than alongside the application,
+# because that is where kube-prometheus-stack's Grafana and its dashboard sidecar
+# run. The dashboard has a `namespace` template variable, so one copy can chart
+# whichever application namespace you select in the UI.
+
+namespace: monitoring
+
+configMapGenerator:
+  - name: projectcamp-dashboards
+    files:
+      - projectcamp-golden-signals.json=dashboard.json
+    options:
+      labels:
+        # The Grafana sidecar installed by kube-prometheus-stack watches for
+        # exactly this label and loads any dashboard JSON it finds. Without it the
+        # ConfigMap is inert.
+        grafana_dashboard: "1"
+
+generatorOptions:
+  # Suppress the content hash suffix. The sidecar tracks dashboards by ConfigMap
+  # name, and a name that changes on every edit would leave stale copies behind.
+  disableNameSuffixHash: true
